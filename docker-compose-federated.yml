@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  hub:
+    build:
+      context: ./hub
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+
+  server:
+    build:
+      context: ./server
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - HUB_URL=ws://hub:3001
+      - REGION=test-region
+      - PUBLIC_WS_URL=ws://localhost:3000
+    depends_on:
+      - hub

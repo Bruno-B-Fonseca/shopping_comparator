@@ -24,18 +24,81 @@ class ShoppingComparatorApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blueAccent,
+          seedColor: const Color(0xFF1E88E5),
           brightness: Brightness.light,
+          surface: const Color(0xFFFAFAFA),
         ),
-        textTheme: GoogleFonts.robotoTextTheme(),
+        textTheme: GoogleFonts.interTextTheme().copyWith(
+          displayLarge: GoogleFonts.poppins(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+          ),
+          displayMedium: GoogleFonts.poppins(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
+          headlineSmall: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+          bodyMedium: GoogleFonts.inter(fontSize: 14),
+          labelSmall: GoogleFonts.inter(fontSize: 12),
+        ),
+        cardTheme: CardThemeData(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+        ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blueAccent,
+          seedColor: const Color(0xFF1E88E5),
           brightness: Brightness.dark,
+          surface: const Color(0xFF121212),
         ),
-        textTheme: GoogleFonts.robotoTextTheme(ThemeData.dark().textTheme),
+        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme)
+            .copyWith(
+              displayLarge: GoogleFonts.poppins(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
+              displayMedium: GoogleFonts.poppins(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+              headlineSmall: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+              bodyMedium: GoogleFonts.inter(fontSize: 14),
+              labelSmall: GoogleFonts.inter(fontSize: 12),
+            ),
+        cardTheme: CardThemeData(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+        ),
       ),
       home: const HomeScreen(),
     );

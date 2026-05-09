@@ -4,6 +4,7 @@ import '../models/product.dart';
 import '../models/cart_item.dart';
 import '../services/storage_service.dart';
 import '../providers/cart_provider.dart';
+import '../widgets/empty_state_widget.dart';
 import '../widgets/barcode_scanner_widget.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
@@ -204,7 +205,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 ),
               ),
             ] else
-              const Center(child: Text('Enter barcode to start')),
+              EmptyStateWidget(
+                icon: Icons.qr_code_scanner,
+                title: 'Comece a escanear',
+                description: 'Digite um código de barras ou use a câmera para procurar produtos',
+                buttonLabel: 'Abrir câmera',
+                onButtonPressed: _lookupProduct,
+              ),
           ],
         ),
       ),

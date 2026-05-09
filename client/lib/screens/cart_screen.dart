@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../providers/cart_provider.dart';
 import '../services/storage_service.dart';
+import '../widgets/empty_state_widget.dart';
 
 class CartScreen extends ConsumerWidget {
   const CartScreen({super.key});
@@ -26,7 +27,15 @@ class CartScreen extends ConsumerWidget {
         ],
       ),
       body: cartItems.isEmpty
-          ? const Center(child: Text('Your cart is empty'))
+          ? EmptyStateWidget(
+              icon: Icons.shopping_cart_outlined,
+              title: 'Carrinho vazio',
+              description: 'Comece adicionando produtos para comparar preços',
+              buttonLabel: 'Continuar comprando',
+              onButtonPressed: () {
+                // Navigate back to scan screen
+              },
+            )
           : Column(
               children: [
                 Expanded(
@@ -36,17 +45,52 @@ class CartScreen extends ConsumerWidget {
                       final item = cartItems[index];
                       final product = StorageService.products.get(item.barcode);
 
-                      return ListTile(
-                        title: Text(product?.name ?? 'Unknown Product'),
-                        subtitle: Text(
-                          '${item.quantity} x ${currencyFormat.format(item.unitPrice)}',
+                      return Dismissible(
+                        key: Key('${item.barcode}_$index'),
+                        background: Container(
+                          color: Colors.red.withOpacity(0.8),
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 16),
+                          child: const Icon(
+                            Icons.delete,
+                            color: Colors.white,
+                          ),
                         ),
-                        trailing: Text(
-                          currencyFormat.format(item.total),
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        confirmDismiss: (direction) async {
+                          return await showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Remove item?'),
+                              content: const Text('This item will be removed from your cart.'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Remove'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        onDismissed: (direction) {
+                          ref.read(cartProvider.notifier).removeItem(index);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Item removed from cart')),
+                          );
+                        },
+                        child: ListTile(
+                          title: Text(product?.name ?? 'Unknown Product'),
+                          subtitle: Text(
+                            '${item.quantity} x ${currencyFormat.format(item.unitPrice)}',
+                          ),
+                          trailing: Text(
+                            currencyFormat.format(item.total),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
-                        onLongPress: () =>
-                            ref.read(cartProvider.notifier).removeItem(index),
                       );
                     },
                   ),

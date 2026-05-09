@@ -49,5 +49,18 @@ dart pub get
 dart run bin/server.dart
 ```
 
-## License
-MIT
+## Federated Network (Beta)
+The Shopping Comparator can now connect to a federated network of WebSocket servers using a central Hub.
+
+### Enabling Federation
+Update your `docker-compose.yml` or local environment variables:
+
+- `HUB_URL=ws://hub-url:3001`
+- `REGION=your-region`
+- `PUBLIC_WS_URL=ws://your-public-url:3000`
+
+### Running with Federation
+You can use `docker-compose-federated.yml` for a test setup:
+```bash
+docker-compose -f docker-compose-federated.yml up -d --build
+```

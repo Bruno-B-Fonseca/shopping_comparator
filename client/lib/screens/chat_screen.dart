@@ -91,7 +91,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isMe ? Colors.blue[100] : Colors.grey[200],
+                      color: isMe
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : Theme.of(context).colorScheme.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -100,9 +102,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         if (!isMe)
                           Text(
                             msg.sender,
-                            style: const TextStyle(
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontSize: 10,
                             ),
                           ),
                         Text(msg.text),
@@ -122,9 +123,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ],
                         Text(
                           '${msg.timestamp.hour}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
-                          style: const TextStyle(
-                            fontSize: 8,
-                            color: Colors.grey,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],

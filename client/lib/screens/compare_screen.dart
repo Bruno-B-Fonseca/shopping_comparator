@@ -6,6 +6,7 @@ import '../services/storage_service.dart';
 import '../services/location_service.dart';
 import '../models/price_update.dart';
 import '../models/location_model.dart';
+import '../widgets/empty_state_widget.dart';
 
 class CompareScreen extends ConsumerStatefulWidget {
   const CompareScreen({super.key});
@@ -22,6 +23,18 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   void initState() {
     super.initState();
     _initLocation();
+  }
+
+  Color _getPriceColor(BuildContext context, PriceUpdate price) {
+    final allPrices = StorageService.prices.values.map((p) => p.price).toList();
+    if (allPrices.isEmpty) return Theme.of(context).colorScheme.primary;
+
+    final avgPrice = allPrices.reduce((a, b) => a + b) / allPrices.length;
+    final diff = ((price.price - avgPrice) / avgPrice) * 100;
+
+    if (diff <= -5) return Colors.green; // Cheapest
+    if (diff >= 5) return Colors.red; // Most expensive
+    return Colors.orange; // Average
   }
 
   Future<void> _initLocation() async {
@@ -45,7 +58,11 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Price Comparison')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? EmptyStateWidget(
+              icon: Icons.location_searching,
+              title: 'Obtendo sua localização',
+              description: 'Aguarde enquanto localizamos os preços mais próximos de você',
+            )
           : FlutterMap(
               options: MapOptions(
                 initialCenter: _currentCenter,
@@ -74,20 +91,21 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: Colors.blue,
+                                    color: _getPriceColor(context, price),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
                                     'R\$ ${price.price.toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onPrimary,
                                       fontSize: 10,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
                                 const Icon(
                                   Icons.location_on,
-                                  color: Colors.red,
+                                  color: Colors.amber,
                                   size: 30,
                                 ),
                               ],
@@ -125,10 +143,10 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
             const SizedBox(height: 10),
             Text(
               'Price: R\$ ${price.price.toStringAsFixed(2)}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.green,
+                color: _getPriceColor(context, price),
               ),
             ),
             Text('Updated: ${price.timestamp.toLocal()}'),
