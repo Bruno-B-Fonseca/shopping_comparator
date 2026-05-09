@@ -54,11 +54,11 @@ class PriceUpdateAdapter extends TypeAdapter<PriceUpdate> {
 // **************************************************************************
 
 PriceUpdate _$PriceUpdateFromJson(Map<String, dynamic> json) => PriceUpdate(
-  barcode: json['barcode'] as String,
-  locationId: json['locationId'] as String,
-  price: (json['price'] as num).toDouble(),
-  timestamp: DateTime.parse(json['timestamp'] as String),
-);
+      barcode: json['barcode'] as String,
+      locationId: json['locationId'] as String,
+      price: (json['price'] as num).toDouble(),
+      timestamp: DateTime.parse(json['timestamp'] as String),
+    );
 
 Map<String, dynamic> _$PriceUpdateToJson(PriceUpdate instance) =>
     <String, dynamic>{

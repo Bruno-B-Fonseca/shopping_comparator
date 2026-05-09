@@ -17,13 +17,13 @@ class Product extends HiveObject {
   final String manufacturer;
 
   @HiveField(4)
-  final String? photoBase64;
+  final String? photoUrl;
 
   Product({
     required this.barcode,
     required this.name,
     required this.unit,
     required this.manufacturer,
-    this.photoBase64,
+    this.photoUrl,
   });
 }

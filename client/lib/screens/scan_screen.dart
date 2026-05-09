@@ -6,6 +6,7 @@ import '../services/storage_service.dart';
 import '../providers/cart_provider.dart';
 import '../widgets/empty_state_widget.dart';
 import '../widgets/barcode_scanner_widget.dart';
+import '../widgets/product_image_picker.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
   const ScanScreen({super.key});
@@ -57,49 +58,77 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final unitController = TextEditingController(text: 'un');
     final manufacturerController = TextEditingController();
 
+    String? photoUrl; // Variável local para armazenar a URL
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New Product'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Name'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('New Product'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Name'),
+              ),
+              TextField(
+                controller: unitController,
+                decoration: const InputDecoration(labelText: 'Unit'),
+              ),
+              TextField(
+                controller: manufacturerController,
+                decoration: const InputDecoration(labelText: 'Manufacturer'),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Text('Photo: '),
+                  ProductImagePicker(
+                    onImageUploaded: (url) {
+                      setDialogState(() => photoUrl = url);
+                    },
+                  ),
+                  if (photoUrl != null) 
+                    const Icon(Icons.check, color: Colors.green),
+                ],
+              ),
+              if (photoUrl != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Image.network(
+                    photoUrl!,
+                    height: 100,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Text('Failed to load preview'),
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
             ),
-            TextField(
-              controller: unitController,
-              decoration: const InputDecoration(labelText: 'Unit'),
-            ),
-            TextField(
-              controller: manufacturerController,
-              decoration: const InputDecoration(labelText: 'Manufacturer'),
+            ElevatedButton(
+              onPressed: () {
+                final product = Product(
+                  barcode: barcode,
+                  name: nameController.text,
+                  unit: unitController.text,
+                  manufacturer: manufacturerController.text,
+                  photoUrl: photoUrl,
+                );
+                StorageService.products.put(barcode, product);
+                setState(() {
+                  _currentProduct = product;
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final product = Product(
-                barcode: barcode,
-                name: nameController.text,
-                unit: unitController.text,
-                manufacturer: manufacturerController.text,
-              );
-              StorageService.products.put(barcode, product);
-              setState(() {
-                _currentProduct = product;
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
   }
@@ -166,6 +195,16 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             if (_currentProduct != null) ...[
               Card(
                 child: ListTile(
+                  leading: _currentProduct!.photoUrl != null
+                      ? Image.network(
+                          _currentProduct!.photoUrl!,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(Icons.image_not_supported),
+                        )
+                      : const Icon(Icons.image),
                   title: Text(_currentProduct!.name),
                   subtitle: Text(
                     '${_currentProduct!.manufacturer} (${_currentProduct!.unit})',

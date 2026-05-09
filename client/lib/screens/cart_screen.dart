@@ -82,6 +82,16 @@ class CartScreen extends ConsumerWidget {
                           );
                         },
                         child: ListTile(
+                          leading: product?.photoUrl != null
+                              ? Image.network(
+                                  product!.photoUrl!,
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(Icons.image_not_supported),
+                                )
+                              : const Icon(Icons.image),
                           title: Text(product?.name ?? 'Unknown Product'),
                           subtitle: Text(
                             '${item.quantity} x ${currencyFormat.format(item.unitPrice)}',
