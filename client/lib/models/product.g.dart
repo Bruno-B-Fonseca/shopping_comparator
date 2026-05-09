@@ -21,7 +21,7 @@ class ProductAdapter extends TypeAdapter<Product> {
       name: fields[1] as String,
       unit: fields[2] as String,
       manufacturer: fields[3] as String,
-      photoBase64: fields[4] as String?,
+      photoUrl: fields[4] as String?,
     );
   }
 
@@ -38,7 +38,7 @@ class ProductAdapter extends TypeAdapter<Product> {
       ..writeByte(3)
       ..write(obj.manufacturer)
       ..writeByte(4)
-      ..write(obj.photoBase64);
+      ..write(obj.photoUrl);
   }
 
   @override

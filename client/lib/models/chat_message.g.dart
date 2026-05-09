@@ -57,14 +57,14 @@ class ChatMessageAdapter extends TypeAdapter<ChatMessage> {
 // **************************************************************************
 
 ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => ChatMessage(
-  id: json['id'] as String,
-  sender: json['sender'] as String,
-  text: json['text'] as String,
-  timestamp: DateTime.parse(json['timestamp'] as String),
-  priceUpdate: json['priceUpdate'] == null
-      ? null
-      : PriceUpdate.fromJson(json['priceUpdate'] as Map<String, dynamic>),
-);
+      id: json['id'] as String,
+      sender: json['sender'] as String,
+      text: json['text'] as String,
+      timestamp: DateTime.parse(json['timestamp'] as String),
+      priceUpdate: json['priceUpdate'] == null
+          ? null
+          : PriceUpdate.fromJson(json['priceUpdate'] as Map<String, dynamic>),
+    );
 
 Map<String, dynamic> _$ChatMessageToJson(ChatMessage instance) =>
     <String, dynamic>{
