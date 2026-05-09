@@ -1,0 +1,53 @@
+# Shopping Comparator MVP
+
+Collaborative shopping cart and price comparison web application.
+
+## Features
+- **Offline-first:** Local storage via Hive.
+- **Collaborative:** Real-time price updates and chat via WebSockets.
+- **Map View:** Visualization of local prices on OpenStreetMap.
+- **PWA:** Can be installed on mobile and desktop.
+
+## Tech Stack
+- **Frontend:** Flutter Web + Riverpod + Hive.
+- **Backend:** Dart + Shelf (WebSocket Server).
+- **Infrastructure:** Docker Compose + Nginx + ngrok.
+
+## How to Run
+
+### 1. Requirements
+- Docker and Docker Compose.
+- [ngrok](https://ngrok.com/) authtoken (for public access).
+
+### 2. Setup
+1. Copy `.env.example` to `.env`.
+2. Edit `.env` and add your `NGROK_AUTHTOKEN`.
+
+### 3. Deploy
+```bash
+docker-compose up -d --build
+```
+
+- **App:** http://localhost:8080
+- **WebSocket:** ws://localhost:3000
+- **ngrok status:** http://localhost:4040
+
+## Development
+
+### Client (Flutter)
+```bash
+cd client
+flutter pub get
+dart run build_runner build
+flutter run -d chrome
+```
+
+### Server (Dart)
+```bash
+cd server
+dart pub get
+dart run bin/server.dart
+```
+
+## License
+MIT
