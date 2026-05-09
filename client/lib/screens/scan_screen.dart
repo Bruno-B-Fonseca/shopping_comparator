@@ -89,7 +89,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                       setDialogState(() => photoUrl = url);
                     },
                   ),
-                  if (photoUrl != null) 
+                  if (photoUrl != null)
                     const Icon(Icons.check, color: Colors.green),
                 ],
               ),
@@ -247,7 +247,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               EmptyStateWidget(
                 icon: Icons.qr_code_scanner,
                 title: 'Comece a escanear',
-                description: 'Digite um código de barras ou use a câmera para procurar produtos',
+                description:
+                    'Digite um código de barras ou use a câmera para procurar produtos',
                 buttonLabel: 'Abrir câmera',
                 onButtonPressed: _lookupProduct,
               ),

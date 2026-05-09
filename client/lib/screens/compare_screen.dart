@@ -61,7 +61,8 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           ? EmptyStateWidget(
               icon: Icons.location_searching,
               title: 'Obtendo sua localização',
-              description: 'Aguarde enquanto localizamos os preços mais próximos de você',
+              description:
+                  'Aguarde enquanto localizamos os preços mais próximos de você',
             )
           : FlutterMap(
               options: MapOptions(
@@ -97,7 +98,9 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                                   child: Text(
                                     'R\$ ${price.price.toStringAsFixed(2)}',
                                     style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onPrimary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimary,
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                     ),

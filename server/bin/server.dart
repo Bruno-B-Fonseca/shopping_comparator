@@ -64,16 +64,20 @@ void main() async {
         {
           'Action': ['s3:GetBucketLocation', 's3:ListBucket'],
           'Effect': 'Allow',
-          'Principal': {'AWS': ['*']},
-          'Resource': ['arn:aws:s3:::$bucketName']
+          'Principal': {
+            'AWS': ['*'],
+          },
+          'Resource': ['arn:aws:s3:::$bucketName'],
         },
         {
           'Action': ['s3:GetObject'],
           'Effect': 'Allow',
-          'Principal': {'AWS': ['*']},
-          'Resource': ['arn:aws:s3:::$bucketName/*']
-        }
-      ]
+          'Principal': {
+            'AWS': ['*'],
+          },
+          'Resource': ['arn:aws:s3:::$bucketName/*'],
+        },
+      ],
     };
     await minio.setBucketPolicy(bucketName, policy);
     print('Bucket $bucketName policy set to public');

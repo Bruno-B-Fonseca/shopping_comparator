@@ -48,23 +48,23 @@ class CartScreen extends ConsumerWidget {
                       return Dismissible(
                         key: Key('${item.barcode}_$index'),
                         background: Container(
-                          color: Colors.red.withOpacity(0.8),
+                          color: Colors.red.withValues(alpha: 0.8),
                           alignment: Alignment.centerRight,
                           padding: const EdgeInsets.only(right: 16),
-                          child: const Icon(
-                            Icons.delete,
-                            color: Colors.white,
-                          ),
+                          child: const Icon(Icons.delete, color: Colors.white),
                         ),
                         confirmDismiss: (direction) async {
                           return await showDialog(
                             context: context,
                             builder: (context) => AlertDialog(
                               title: const Text('Remove item?'),
-                              content: const Text('This item will be removed from your cart.'),
+                              content: const Text(
+                                'This item will be removed from your cart.',
+                              ),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(context, false),
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
@@ -78,7 +78,9 @@ class CartScreen extends ConsumerWidget {
                         onDismissed: (direction) {
                           ref.read(cartProvider.notifier).removeItem(index);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Item removed from cart')),
+                            const SnackBar(
+                              content: Text('Item removed from cart'),
+                            ),
                           );
                         },
                         child: ListTile(

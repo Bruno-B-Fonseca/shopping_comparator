@@ -33,7 +33,7 @@ void main() {
     // Initialize Hive for tests
     final tempDir = Directory.systemTemp.createTempSync();
     Hive.init(tempDir.path);
-    
+
     // Register Adapters manually for test
     Hive.registerAdapter(ProductAdapter());
     Hive.registerAdapter(LocationModelAdapter());

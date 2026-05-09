@@ -2,7 +2,8 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class ImageService {
-  static const String _baseUrl = 'http://localhost:3000'; // Ajustar conforme necessário
+  static const String _baseUrl =
+      'http://localhost:3000'; // Ajustar conforme necessário
 
   static Future<String?> uploadImage(File imageFile) async {
     try {

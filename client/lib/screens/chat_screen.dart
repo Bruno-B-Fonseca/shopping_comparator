@@ -102,9 +102,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         if (!isMe)
                           Text(
                             msg.sender,
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         Text(msg.text),
                         if (msg.priceUpdate != null) ...[
@@ -123,9 +122,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ],
                         Text(
                           '${msg.timestamp.hour}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                         ),
                       ],
                     ),

@@ -18,7 +18,9 @@ class _ProductImagePickerState extends State<ProductImagePicker> {
   bool _isUploading = false;
 
   Future<void> _pickAndEditImage() async {
-    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? pickedFile = await _picker.pickImage(
+      source: ImageSource.gallery,
+    );
     if (pickedFile == null) return;
 
     final imageBytes = await pickedFile.readAsBytes();
@@ -27,23 +29,21 @@ class _ProductImagePickerState extends State<ProductImagePicker> {
     if (!mounted) return;
     final editedImage = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => ImageEditor(
-          image: imageBytes,
-        ),
-      ),
+      MaterialPageRoute(builder: (context) => ImageEditor(image: imageBytes)),
     );
 
     if (editedImage != null) {
       if (!mounted) return;
       setState(() => _isUploading = true);
-      
+
       // Salvar bytes editados temporariamente para upload
-      final tempFile = File('${Directory.systemTemp.path}/edit_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final tempFile = File(
+        '${Directory.systemTemp.path}/edit_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
       await tempFile.writeAsBytes(editedImage);
 
       final url = await ImageService.uploadImage(tempFile);
-      
+
       if (!mounted) return;
       setState(() => _isUploading = false);
 

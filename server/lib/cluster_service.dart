@@ -10,9 +10,10 @@ class ClusterService {
   final String region;
   final String serverId;
   final String publicWsUrl;
-  
+
   late WebSocketChannel _hubChannel;
-  final Function(Map<String, dynamic> payload, String originServerId) onRelayMessage;
+  final Function(Map<String, dynamic> payload, String originServerId)
+  onRelayMessage;
 
   ClusterService({
     required this.hubUrl,
@@ -25,12 +26,14 @@ class ClusterService {
     _log.info('Connecting to Hub: $hubUrl');
     _hubChannel = WebSocketChannel.connect(Uri.parse(hubUrl));
 
-    _hubChannel.sink.add(jsonEncode({
-      'type': 'register',
-      'serverId': serverId,
-      'region': region,
-      'wsUrl': publicWsUrl,
-    }));
+    _hubChannel.sink.add(
+      jsonEncode({
+        'type': 'register',
+        'serverId': serverId,
+        'region': region,
+        'wsUrl': publicWsUrl,
+      }),
+    );
 
     _hubChannel.stream.listen(
       (message) {
@@ -54,17 +57,12 @@ class ClusterService {
   }
 
   void publish(String topic, Map<String, dynamic> payload) {
-    _hubChannel.sink.add(jsonEncode({
-      'type': 'publish',
-      'topic': topic,
-      'payload': payload,
-    }));
+    _hubChannel.sink.add(
+      jsonEncode({'type': 'publish', 'topic': topic, 'payload': payload}),
+    );
   }
 
   void subscribe(List<String> topics) {
-    _hubChannel.sink.add(jsonEncode({
-      'type': 'subscribe',
-      'topics': topics,
-    }));
+    _hubChannel.sink.add(jsonEncode({'type': 'subscribe', 'topics': topics}));
   }
 }
