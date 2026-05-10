@@ -168,6 +168,23 @@ void main() async {
 
   final pipeline = const Pipeline()
       .addMiddleware(logRequests())
+      .addMiddleware((innerHandler) {
+        return (request) async {
+          if (request.method == 'OPTIONS') {
+            return Response.ok('', headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
+            });
+          }
+          final response = await innerHandler(request);
+          return response.change(headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
+          });
+        };
+      })
       .addHandler(router.call);
 
   final server = await ioshelf.serve(pipeline, InternetAddress.anyIPv4, port);

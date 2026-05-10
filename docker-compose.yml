@@ -4,6 +4,7 @@ services:
       context: ./server
     environment:
       - PORT=3000
+      - MINIO_ENDPOINT=minio
     restart: always
 
   minio:

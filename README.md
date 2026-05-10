@@ -7,11 +7,13 @@ Collaborative shopping cart and price comparison web application.
 - **Collaborative:** Real-time price updates and chat via WebSockets.
 - **Map View:** Visualization of local prices on OpenStreetMap.
 - **PWA:** Can be installed on mobile and desktop.
+- **Federated Network:** Connect to a federated network of WebSocket servers using a central Hub for distributed data synchronization.
+- **MinIO Image Storage:** Scalable and performant image storage integrated for product images, replacing Base64 encoding.
 
 ## Tech Stack
 - **Frontend:** Flutter Web + Riverpod + Hive.
 - **Backend:** Dart + Shelf (WebSocket Server).
-- **Infrastructure:** Docker Compose + Nginx + ngrok.
+- **Infrastructure:** Docker Compose + Nginx + ngrok + MinIO.
 
 ## How to Run
 
@@ -28,7 +30,7 @@ Collaborative shopping cart and price comparison web application.
 docker-compose up -d --build
 ```
 
-- **App:** http://localhost:8080
+- **App:** http://localhost:8081
 - **WebSocket:** ws://localhost:3000
 - **ngrok status:** http://localhost:4040
 

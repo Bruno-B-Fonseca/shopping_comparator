@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../providers/cart_provider.dart';
+import '../providers/navigation_provider.dart';
 import '../services/storage_service.dart';
 import '../widgets/empty_state_widget.dart';
 
@@ -33,7 +34,7 @@ class CartScreen extends ConsumerWidget {
               description: 'Comece adicionando produtos para comparar preços',
               buttonLabel: 'Continuar comprando',
               onButtonPressed: () {
-                // Navigate back to scan screen
+                ref.read(navigationProvider.notifier).state = 0;
               },
             )
           : Column(

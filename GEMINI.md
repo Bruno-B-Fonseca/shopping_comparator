@@ -28,6 +28,7 @@ A collaborative shopping cart and price comparison web application (MVP). This p
 ## Core Components
 
 ### Data Models (Hive)
+
 - `Product`: Barcode, name, unit, manufacturer, photo.
 - `Location`: Coordinates (Lat/Long).
 - `PriceUpdate`: Product link, price, location, timestamp.
@@ -35,6 +36,7 @@ A collaborative shopping cart and price comparison web application (MVP). This p
 - `ChatMessage`: User, text, timestamp, optional price update payload.
 
 ### Services
+
 - `StorageService`: Manages Hive boxes and persistence.
 - `WebSocketService`: Handles connection, reconnection, and message routing.
 - `LocationService`: Fetches current coordinates for map positioning and distance calculation.
@@ -42,22 +44,26 @@ A collaborative shopping cart and price comparison web application (MVP). This p
 ## Implementation Roadmap
 
 ### Phase 1: Environment & Backend
+
 - Initialize workspace and directory structure.
 - WebSocket server implementation (message broadcasting).
 - Dockerization of the backend.
 
 ### Phase 2: Frontend Foundation (Offline-First)
+
 - Initialize Flutter Web project.
 - Implement Hive adapters for all data models.
 - Set up core services (Storage, WebSocket, Location).
 
 ### Phase 3: Core Features
+
 - Scanning & Product registration (offline-first).
 - Shopping Cart management.
 - Map & Comparison mode (markers for price updates).
 - Collaborative Chat with price sharing.
 
 ### Phase 4: Infrastructure & Deployment
+
 - Nginx setup to serve the web build.
 - Full orchestration with Docker Compose.
 - ngrok integration for public access.
@@ -72,14 +78,17 @@ A collaborative shopping cart and price comparison web application (MVP). This p
 
 ### Setup
 
-1.  Clone the repository.
-2.  Copy `.env.example` to `.env` and configure your `NGROK_AUTHTOKEN`.
-3.  Install dependencies:
+1. Clone the repository.
+2. Copy `.env.example` to `.env` and configure your `NGROK_AUTHTOKEN`.
+3. Install dependencies:
+
     ```bash
     # Client
     cd client && flutter pub get
     # Server
     cd server && dart pub get
+    # Hub
+    cd hub && dart pub get
     ```
 
 ### Running with Docker
@@ -87,20 +96,24 @@ A collaborative shopping cart and price comparison web application (MVP). This p
 ```bash
 docker-compose up -d --build
 ```
-- **App**: http://localhost:8081
+
+- **App**: <http://localhost:8081>
 - **WebSocket**: ws://localhost:3000
-- **ngrok status**: http://localhost:4040
+- **ngrok status**: <http://localhost:4040>
 
 ## Development Guide
 
 ### Client Development
 
 - **Code Generation**: This project uses `build_runner` for Hive adapters and JSON serialization. Run this whenever you modify models:
+
   ```bash
   cd client
   dart run build_runner build --delete-conflicting-outputs
   ```
+
 - **Running locally**:
+
   ```bash
   cd client
   flutter run -d chrome
@@ -109,10 +122,21 @@ docker-compose up -d --build
 ### Server Development
 
 - **Running locally**:
+
   ```bash
   cd server
   dart run bin/server.dart
   ```
+
+### Federative Development
+
+- **Running locally**:
+
+  ```bash
+  cd hub
+  dart run bin/server.dart
+
+```
 
 ## Project Structure
 
@@ -125,10 +149,31 @@ docker-compose up -d --build
 │   │   ├── screens/  # UI Screens
 │   │   ├── services/ # Logic (Storage, WebSockets, Location)
 │   │   └── widgets/  # Reusable Widgets
+├── hub/              # Dart Federative Server
 ├── server/           # Dart WebSocket Server
 ├── web-server/       # Nginx configuration for production/Docker
 └── docker-compose.yml# Main orchestration file
 ```
+
+## Design Decisions
+
+### Federated Network Implementation
+
+To enable a federated network for WebSocket servers, the following components were implemented:
+
+- **Hub (Registry & Relay)**: A central service (`hub/`) responsible for managing server registrations, topic subscriptions, and relaying messages between servers. It uses `shelf` and `shelf_web_socket`.
+- **ClusterService**: Implemented in the server (`server/lib/cluster_service.dart`) to connect to the Hub, register the server, handle incoming relayed messages, and publish local messages to the Hub.
+- **Environment Variables**: Support for `HUB_URL`, `REGION`, and `PUBLIC_WS_URL` was added to configure federation.
+- **Docker Integration**: The Hub service was added to `docker-compose.yml`.
+
+### MinIO Image Storage Integration
+
+To improve image handling, scalability, and performance, MinIO was integrated as the primary image storage service:
+
+- **Objective**: Replace Base64 storage in Hive with external URLs, reducing data bloat and improving synchronization.
+- **Backend Changes**: Added MinIO dependency, created interaction service, and implemented an upload route (`POST /products/upload-photo`). The API now provides image URLs.
+- **Frontend Changes**: Refactored `Product` model to use `photoUrl` instead of `photoBase64`, implemented `ImageService`, and updated UI to display images via `Image.network`.
+- **Infrastructure**: MinIO service added to `docker-compose.yml` with persistent volume mapping.
 
 ## Coding Conventions
 

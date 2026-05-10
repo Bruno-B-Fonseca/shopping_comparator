@@ -10,7 +10,8 @@ final webSocketServiceProvider = Provider<WebSocketService>((ref) {
   if (kIsWeb) {
     final uri = Uri.base;
     final protocol = uri.scheme == 'https' ? 'wss' : 'ws';
-    wsUrl = '$protocol://${uri.host}:${uri.port}/ws';
+    final port = uri.hasPort ? ':${uri.port}' : '';
+    wsUrl = '$protocol://${uri.host}$port/ws';
   }
 
   service.connect(wsUrl);

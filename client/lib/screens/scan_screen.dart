@@ -40,17 +40,15 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     }
   }
 
-  void _openScanner() {
-    Navigator.push(
+  Future<void> _openScanner() async {
+    final String? barcode = await Navigator.push<String>(
       context,
-      MaterialPageRoute(
-        builder: (context) => BarcodeScannerWidget(
-          onDetect: (barcode) {
-            _lookupProduct(barcode);
-          },
-        ),
-      ),
+      MaterialPageRoute(builder: (context) => const BarcodeScannerWidget()),
     );
+
+    if (barcode != null && mounted) {
+      _lookupProduct(barcode);
+    }
   }
 
   void _showRegisterDialog(String barcode) {
@@ -250,7 +248,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 description:
                     'Digite um código de barras ou use a câmera para procurar produtos',
                 buttonLabel: 'Abrir câmera',
-                onButtonPressed: _lookupProduct,
+                onButtonPressed: _openScanner,
               ),
           ],
         ),
