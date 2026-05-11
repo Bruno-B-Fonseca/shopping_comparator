@@ -18,11 +18,15 @@ class PriceUpdate extends HiveObject {
   @HiveField(3)
   final DateTime timestamp;
 
+  @HiveField(4)
+  final String? messageId;
+
   PriceUpdate({
     required this.barcode,
     required this.locationId,
     required this.price,
     required this.timestamp,
+    this.messageId,
   });
 
   factory PriceUpdate.fromJson(Map<String, dynamic> json) =>

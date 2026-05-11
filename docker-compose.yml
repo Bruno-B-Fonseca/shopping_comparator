@@ -5,6 +5,7 @@ services:
     environment:
       - PORT=3000
       - MINIO_ENDPOINT=minio
+      - FORCE_HTTPS=true
     restart: always
 
   minio:

@@ -22,12 +22,16 @@ class ChatMessage extends HiveObject {
   @HiveField(4)
   final PriceUpdate? priceUpdate;
 
+  @HiveField(5)
+  final String? messageId;
+
   ChatMessage({
     required this.id,
     required this.sender,
     required this.text,
     required this.timestamp,
     this.priceUpdate,
+    this.messageId,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) =>

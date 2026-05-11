@@ -1,11 +1,19 @@
+import 'package:client/services/image_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/product.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
 import '../models/cart_item.dart';
-import '../services/storage_service.dart';
+import '../models/location_model.dart';
+import '../models/price_update.dart';
+import '../models/product.dart';
 import '../providers/cart_provider.dart';
-import '../widgets/empty_state_widget.dart';
+import '../providers/websocket_provider.dart';
+import '../services/location_service.dart';
+import '../services/storage_service.dart';
+import '../services/websocket_service.dart';
 import '../widgets/barcode_scanner_widget.dart';
+import '../widgets/empty_state_widget.dart';
 import '../widgets/product_image_picker.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
@@ -21,8 +29,22 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   final _qtyController = TextEditingController(text: '1');
 
   Product? _currentProduct;
+  bool _isSearchingCluster = false;
 
-  void _lookupProduct([String? barcode]) {
+  void _updatePriceFromStorage(String barcode) {
+    final prices =
+        StorageService.prices.values.where((p) => p.barcode == barcode).toList()
+          ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+    if (prices.isNotEmpty) {
+      final latestPrice = prices.first.price.toStringAsFixed(2);
+      if (_priceController.text != latestPrice) {
+        _priceController.text = latestPrice;
+      }
+    }
+  }
+
+  void _lookupProduct([String? barcode]) async {
     final code = barcode ?? _barcodeController.text;
     if (code.isEmpty) return;
 
@@ -31,13 +53,90 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     }
 
     final product = StorageService.products.get(code);
+    if (product != null) {
+      setState(() {
+        _currentProduct = product;
+        _isSearchingCluster = false;
+        _updatePriceFromStorage(code);
+      });
+      return;
+    }
+
+    // Se não encontrou localmente, busca no cluster
     setState(() {
-      _currentProduct = product;
+      _isSearchingCluster = true;
+      _currentProduct = null;
     });
 
-    if (product == null) {
-      _showRegisterDialog(code);
+    final wsService = ref.read(webSocketServiceProvider);
+
+    // Aguarda até 2 segundos pela conexão se estiver 'connecting'
+    if (wsService.currentStatus == WebSocketStatus.connecting) {
+      for (
+        int i = 0;
+        i < 10 && wsService.currentStatus == WebSocketStatus.connecting;
+        i++
+      ) {
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
     }
+
+    if (wsService.currentStatus == WebSocketStatus.connected) {
+      debugPrint('ScanScreen: Solicitando produto $code ao cluster...');
+      wsService.sendMessage({
+        'type': 'product_request',
+        'payload': {'barcode': code},
+      });
+    } else {
+      debugPrint(
+        'ScanScreen: Não foi possível enviar solicitação (Status=${wsService.currentStatus})',
+      );
+    }
+
+    // Aguarda até 5 segundos por uma resposta
+    for (int i = 0; i < 10; i++) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+
+      final foundProduct = StorageService.products.get(code);
+      if (foundProduct != null) {
+        // Produto localizado! Agora damos mais 1 segundo pro preço chegar (mensagens separadas)
+        for (int j = 0; j < 5; j++) {
+          final pList = StorageService.prices.values
+              .where((p) => p.barcode == code)
+              .toList();
+          if (pList.isNotEmpty) break;
+          await Future.delayed(const Duration(milliseconds: 200));
+        }
+
+        setState(() {
+          _currentProduct = foundProduct;
+          _isSearchingCluster = false;
+          _updatePriceFromStorage(code);
+        });
+
+        final pricesExist = StorageService.prices.values.any(
+          (p) => p.barcode == code,
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              pricesExist
+                  ? 'Produto e preço localizados!'
+                  : 'Produto localizado (sem preço recente).',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    // Se após 5s não encontrou, abre o cadastro
+    setState(() {
+      _isSearchingCluster = false;
+    });
+    _showRegisterDialog(code);
   }
 
   Future<void> _openScanner() async {
@@ -51,7 +150,31 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     }
   }
 
+  void _syncProduct(Product product) {
+    final wsService = ref.read(webSocketServiceProvider);
+
+    if (wsService.currentStatus == WebSocketStatus.connected) {
+      wsService.sendMessage({
+        'type': 'product_registration',
+        'payload': product.toJson(),
+      });
+      debugPrint('Sync: Produto enviado com sucesso');
+    } else {
+      // Tenta novamente em 2 segundos
+      debugPrint('Sync: Sem conexão, agendando tentativa...');
+      Future.delayed(const Duration(seconds: 2), () => _syncProduct(product));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aguardando conexão para sincronizar...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
   void _showRegisterDialog(String barcode) {
+    // ... rest of variables
     final nameController = TextEditingController();
     final unitController = TextEditingController(text: 'un');
     final manufacturerController = TextEditingController();
@@ -95,7 +218,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0),
                   child: Image.network(
-                    photoUrl!,
+                    ImageService.sanitizeUrl(photoUrl),
                     height: 100,
                     errorBuilder: (context, error, stackTrace) =>
                         const Text('Failed to load preview'),
@@ -118,6 +241,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                   photoUrl: photoUrl,
                 );
                 StorageService.products.put(barcode, product);
+
+                // Inicia o processo de sincronização com retry
+                _syncProduct(product);
+
                 setState(() {
                   _currentProduct = product;
                 });
@@ -131,7 +258,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     );
   }
 
-  void _addToCart() {
+  void _addToCart() async {
     if (_currentProduct == null) return;
     final price = double.tryParse(_priceController.text) ?? 0.0;
     final qty = double.tryParse(_qtyController.text) ?? 1.0;
@@ -141,6 +268,49 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         const SnackBar(content: Text('Please enter a valid price')),
       );
       return;
+    }
+
+    // Registrar atualização de preço se houver localização
+    final position = await LocationService.getCurrentPosition();
+    if (position != null) {
+      final locationId =
+          '${position.latitude.toStringAsFixed(4)}_${position.longitude.toStringAsFixed(4)}';
+
+      // Salva localização se não existir
+      if (!StorageService.locations.containsKey(locationId)) {
+        final loc = LocationModel(
+          id: locationId,
+          name: 'Supermercado Próximo',
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+        StorageService.locations.put(locationId, loc);
+
+        // Sincroniza localização
+        ref.read(webSocketServiceProvider).sendMessage({
+          'type': 'location_registration',
+          'payload': loc.toJson(),
+        });
+      }
+
+      final priceUpdate = PriceUpdate(
+        barcode: _currentProduct!.barcode,
+        locationId: locationId,
+        price: price,
+        timestamp: DateTime.now(),
+      );
+
+      StorageService.prices.put(
+        '${priceUpdate.barcode}_$locationId',
+        priceUpdate,
+      );
+
+      // Sincroniza preço
+      ref.read(webSocketServiceProvider).sendMessage({
+        'type': 'price_update',
+        'payload': priceUpdate.toJson(),
+      });
+      debugPrint('Sync: Preço sincronizado com o cluster');
     }
 
     final cartItem = CartItem(
@@ -190,12 +360,20 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               onSubmitted: (_) => _lookupProduct(),
             ),
             const SizedBox(height: 20),
-            if (_currentProduct != null) ...[
+            if (_isSearchingCluster)
+              const Column(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 10),
+                  Text('Buscando no cluster...'),
+                ],
+              )
+            else if (_currentProduct != null) ...[
               Card(
                 child: ListTile(
                   leading: _currentProduct!.photoUrl != null
                       ? Image.network(
-                          _currentProduct!.photoUrl!,
+                          ImageService.sanitizeUrl(_currentProduct!.photoUrl),
                           width: 50,
                           height: 50,
                           fit: BoxFit.cover,
@@ -213,13 +391,20 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _priceController,
-                      decoration: const InputDecoration(
-                        labelText: 'Price',
-                        prefixText: 'R\$ ',
-                      ),
-                      keyboardType: TextInputType.number,
+                    child: ValueListenableBuilder(
+                      valueListenable: StorageService.prices.listenable(),
+                      builder: (context, box, child) {
+                        // Sempre atualiza o controller se o produto atual mudar ou novo preço chegar
+                        _updatePriceFromStorage(_currentProduct!.barcode);
+                        return TextField(
+                          controller: _priceController,
+                          decoration: const InputDecoration(
+                            labelText: 'Price',
+                            prefixText: 'R\$ ',
+                          ),
+                          keyboardType: TextInputType.number,
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 10),

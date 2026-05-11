@@ -1,6 +1,8 @@
+import 'package:client/models/price_update.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+
 import '../models/chat_message.dart';
 import '../providers/websocket_provider.dart';
 import '../services/storage_service.dart';
@@ -33,24 +35,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       sender: 'User', // Local user name
       text: text,
       timestamp: DateTime.now(),
+      messageId: const Uuid().v4(),
     );
 
     _addMessage(msg);
-    ref.read(webSocketServiceProvider).sendMessage(msg.toJson());
+    
+    // Envia no formato estruturado para o SyncService dos outros clientes
+    ref.read(webSocketServiceProvider).sendMessage({
+      'type': 'chat_message',
+      'payload': msg.toJson(),
+    });
+    
     _messageController.clear();
   }
 
   void _addMessage(ChatMessage msg) {
+    // Evita duplicatas se já estiver no histórico
+    final msgId = msg.messageId ?? msg.id;
+    if (_chatHistory.any((m) => (m.messageId ?? m.id) == msgId)) {
+      return;
+    }
+
     setState(() {
       _chatHistory.add(msg);
     });
     StorageService.messages.add(msg);
 
-    // If it's a price update, save it to the prices box too
+    // Se for um update de preço, salva também no box de preços
     if (msg.priceUpdate != null) {
+      final priceUpdate = msg.priceUpdate!;
+      // Garante que o PriceUpdate tenha o mesmo messageId da mensagem de chat
+      final priceWithId = PriceUpdate(
+        barcode: priceUpdate.barcode,
+        locationId: priceUpdate.locationId,
+        price: priceUpdate.price,
+        timestamp: priceUpdate.timestamp,
+        messageId: msg.messageId ?? msg.id,
+      );
+
       StorageService.prices.put(
-        '${msg.priceUpdate!.barcode}_${msg.priceUpdate!.locationId}',
-        msg.priceUpdate!,
+        '${priceWithId.barcode}_${priceWithId.locationId}',
+        priceWithId,
       );
     }
   }
@@ -60,9 +85,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // Listen for incoming messages
     ref.listen(webSocketMessagesProvider, (previous, next) {
       next.whenData((data) {
-        final msg = ChatMessage.fromJson(data);
-        // Avoid duplicates if we are the sender (simple check by ID)
-        if (!_chatHistory.any((m) => m.id == msg.id)) {
+        final String? type = data['type'];
+        
+        if (type == 'chat_message') {
+          // Novo formato estruturado
+          final msg = ChatMessage.fromJson(data['payload']);
+          _addMessage(msg);
+        } else if (type == null && data.containsKey('sender')) {
+          // Compatibilidade com formato antigo
+          final msg = ChatMessage.fromJson(data);
           _addMessage(msg);
         }
       });

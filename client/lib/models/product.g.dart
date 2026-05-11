@@ -51,3 +51,23 @@ class ProductAdapter extends TypeAdapter<Product> {
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }
+
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+Product _$ProductFromJson(Map<String, dynamic> json) => Product(
+      barcode: json['barcode'] as String,
+      name: json['name'] as String,
+      unit: json['unit'] as String,
+      manufacturer: json['manufacturer'] as String,
+      photoUrl: json['photoUrl'] as String?,
+    );
+
+Map<String, dynamic> _$ProductToJson(Product instance) => <String, dynamic>{
+      'barcode': instance.barcode,
+      'name': instance.name,
+      'unit': instance.unit,
+      'manufacturer': instance.manufacturer,
+      'photoUrl': instance.photoUrl,
+    };

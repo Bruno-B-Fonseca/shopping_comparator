@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/cart_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../services/storage_service.dart';
+import '../services/image_service.dart';
 import '../widgets/empty_state_widget.dart';
 
 class CartScreen extends ConsumerWidget {
@@ -87,7 +88,7 @@ class CartScreen extends ConsumerWidget {
                         child: ListTile(
                           leading: product?.photoUrl != null
                               ? Image.network(
-                                  product!.photoUrl!,
+                                  ImageService.sanitizeUrl(product!.photoUrl),
                                   width: 40,
                                   height: 40,
                                   fit: BoxFit.cover,

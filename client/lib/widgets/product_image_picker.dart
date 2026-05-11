@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_editor_plus/image_editor_plus.dart';
@@ -18,37 +17,46 @@ class _ProductImagePickerState extends State<ProductImagePicker> {
   bool _isUploading = false;
 
   Future<void> _pickAndEditImage() async {
-    final XFile? pickedFile = await _picker.pickImage(
-      source: ImageSource.gallery,
-    );
-    if (pickedFile == null) return;
-
-    final imageBytes = await pickedFile.readAsBytes();
-
-    // Abrir o editor de imagem
-    if (!mounted) return;
-    final editedImage = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => ImageEditor(image: imageBytes)),
-    );
-
-    if (editedImage != null) {
-      if (!mounted) return;
-      setState(() => _isUploading = true);
-
-      // Salvar bytes editados temporariamente para upload
-      final tempFile = File(
-        '${Directory.systemTemp.path}/edit_${DateTime.now().millisecondsSinceEpoch}.jpg',
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
       );
-      await tempFile.writeAsBytes(editedImage);
+      if (pickedFile == null) return;
 
-      final url = await ImageService.uploadImage(tempFile);
+      final imageBytes = await pickedFile.readAsBytes();
 
+      // Abrir o editor de imagem
       if (!mounted) return;
-      setState(() => _isUploading = false);
+      final editedImage = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ImageEditor(image: imageBytes)),
+      );
 
-      if (url != null) {
-        widget.onImageUploaded(url);
+      if (editedImage != null) {
+        if (!mounted) return;
+        setState(() => _isUploading = true);
+
+        // Upload directly from bytes for web compatibility
+        final url = await ImageService.uploadImage(editedImage);
+
+        if (!mounted) return;
+        setState(() => _isUploading = false);
+
+        if (url != null) {
+          widget.onImageUploaded(url);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to upload image')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking/editing image: $e');
+      if (mounted) {
+        setState(() => _isUploading = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -56,7 +64,14 @@ class _ProductImagePickerState extends State<ProductImagePicker> {
   @override
   Widget build(BuildContext context) {
     return _isUploading
-        ? const CircularProgressIndicator()
+        ? const SizedBox(
+            width: 48,
+            height: 48,
+            child: Padding(
+              padding: EdgeInsets.all(8.0),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          )
         : IconButton(
             icon: const Icon(Icons.add_a_photo),
             onPressed: _pickAndEditImage,

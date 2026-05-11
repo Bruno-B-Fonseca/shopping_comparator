@@ -1,0 +1,27 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "client-shopping_comparator",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--web-renderer canvaskit",
+        //"--wasm",
+        "web-serve",
+        "--web-port",
+        "8081", //"5050",
+        //"--web-browser-flag",
+        //"--disable-web-security", //Quando usar o emulador
+        //"--web-experimental-hot-reload",
+        //--pwa-strategy offline-first,
+        "--no-track-widget-creation",
+        "--dart-define=MINIO_ROOT_USER=admin;MINIO_ROOT_PASSWORD=password;PORT=3000;HUB_URL=ws://hub:3001;REGION=${REGION:default};PUBLIC_WS_URL=${PUBLIC_WS_URL:ws://localhost:3000};MINIO_ENDPOINT=minio;MINIO_PORT=9000;MINIO_ROOT_USER=admin;MINIO_ROOT_PASSWORD=password;PUBLIC_URL=${PUBLIC_URL:http://localhost:9000}",
+      ],
+      "flutterMode": "debug"
+    },
+  ]
+}

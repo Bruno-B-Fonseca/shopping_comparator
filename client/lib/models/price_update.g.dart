@@ -21,13 +21,14 @@ class PriceUpdateAdapter extends TypeAdapter<PriceUpdate> {
       locationId: fields[1] as String,
       price: fields[2] as double,
       timestamp: fields[3] as DateTime,
+      messageId: fields[4] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, PriceUpdate obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(5)
       ..writeByte(0)
       ..write(obj.barcode)
       ..writeByte(1)
@@ -35,7 +36,9 @@ class PriceUpdateAdapter extends TypeAdapter<PriceUpdate> {
       ..writeByte(2)
       ..write(obj.price)
       ..writeByte(3)
-      ..write(obj.timestamp);
+      ..write(obj.timestamp)
+      ..writeByte(4)
+      ..write(obj.messageId);
   }
 
   @override
@@ -58,6 +61,7 @@ PriceUpdate _$PriceUpdateFromJson(Map<String, dynamic> json) => PriceUpdate(
       locationId: json['locationId'] as String,
       price: (json['price'] as num).toDouble(),
       timestamp: DateTime.parse(json['timestamp'] as String),
+      messageId: json['messageId'] as String?,
     );
 
 Map<String, dynamic> _$PriceUpdateToJson(PriceUpdate instance) =>
@@ -66,4 +70,5 @@ Map<String, dynamic> _$PriceUpdateToJson(PriceUpdate instance) =>
       'locationId': instance.locationId,
       'price': instance.price,
       'timestamp': instance.timestamp.toIso8601String(),
+      'messageId': instance.messageId,
     };

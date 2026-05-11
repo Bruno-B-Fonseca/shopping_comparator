@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:uuid/uuid.dart';
 import 'package:logging/logging.dart';
+import 'protocol.dart';
 
 final Logger _log = Logger('ClusterService');
 
@@ -28,10 +29,10 @@ class ClusterService {
 
     _hubChannel.sink.add(
       jsonEncode({
-        'type': 'register',
-        'serverId': serverId,
-        'region': region,
-        'wsUrl': publicWsUrl,
+        fieldType: msgRegister,
+        fieldServerId: serverId,
+        fieldRegion: region,
+        fieldWsUrl: publicWsUrl,
       }),
     );
 
@@ -46,23 +47,33 @@ class ClusterService {
   }
 
   void _handleHubMessage(Map<String, dynamic> msg) {
-    switch (msg['type']) {
-      case 'relay':
-        onRelayMessage(msg['payload'], msg['originServerId'] as String);
+    final type = msg[fieldType];
+    switch (type) {
+      case msgPing:
+        _hubChannel.sink.add(jsonEncode({fieldType: msgPong}));
         break;
-      case 'peers_update':
-        _log.info('Peers updated: ${msg['peers']}');
+      case msgRelay:
+        onRelayMessage(msg[fieldPayload], msg[fieldOriginServerId] as String);
+        break;
+      case msgPeersUpdate:
+        _log.info('Peers updated: ${msg[fieldPeers]}');
         break;
     }
   }
 
   void publish(String topic, Map<String, dynamic> payload) {
     _hubChannel.sink.add(
-      jsonEncode({'type': 'publish', 'topic': topic, 'payload': payload}),
+      jsonEncode({
+        fieldType: msgPublish,
+        fieldTopic: topic,
+        fieldPayload: payload,
+      }),
     );
   }
 
   void subscribe(List<String> topics) {
-    _hubChannel.sink.add(jsonEncode({'type': 'subscribe', 'topics': topics}));
+    _hubChannel.sink.add(
+      jsonEncode({fieldType: msgSubscribe, fieldTopics: topics}),
+    );
   }
 }

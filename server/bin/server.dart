@@ -6,11 +6,13 @@ import 'dart:typed_data';
 import 'package:logging/logging.dart';
 import 'package:minio/minio.dart';
 import 'package:server/cluster_service.dart';
+import 'package:server/protocol.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as ioshelf;
 import 'package:shelf_multipart/shelf_multipart.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
+import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 // List of connected clients
@@ -43,7 +45,12 @@ void main() async {
       onRelayMessage: (payload, origin) {
         // Broadcast relayed message to local clients
         _broadcast(
-          jsonEncode({'type': 'relay', 'payload': payload, 'origin': origin}),
+          jsonEncode({
+            fieldType: msgRelay,
+            fieldPayload: payload,
+            'origin':
+                origin, // Keep 'origin' for local client compat or update them too
+          }),
         );
       },
     );
@@ -94,17 +101,36 @@ void main() async {
       print('New client connected');
       _clients.add(webSocket);
 
+      // Envia boas-vindas para confirmar conexão ao cliente
+      webSocket.sink.add(jsonEncode({
+        fieldType: 'connection_established',
+        fieldTimestamp: DateTime.now().toIso8601String(),
+      }));
+
       webSocket.stream.listen(
         (message) {
-          final msg = jsonDecode(message as String);
-          print('Received message: $message');
+          try {
+            final Map<String, dynamic> msg = jsonDecode(message as String);
+            final type = msg[fieldType] ?? 'unknown';
+            print('--- SERVER: Recebido [$type] ---');
 
-          // Broadcast locally
-          _broadcast(message, exclude: webSocket);
+            // Ensure messageId and timestamp exist for deduplication
+            msg[fieldMessageId] ??= const Uuid().v4();
+            msg[fieldTimestamp] ??= DateTime.now().toIso8601String();
 
-          // If not a relay message from hub, publish to cluster
-          if (hubUrl != null && msg['origin'] == null) {
-            _cluster.publish('region/${_cluster.region}', msg);
+            final encodedMsg = jsonEncode(msg);
+
+            // Broadcast locally
+            print('SERVER: Propagando [$type] para ${_clients.length - 1} outros clientes');
+            _broadcast(encodedMsg, exclude: webSocket);
+
+            // If not a relay message from hub, publish to cluster
+            if (hubUrl != null && msg['origin'] == null) {
+              print('SERVER: Enviando [$type] para o Hub');
+              _cluster.publish('region/${_cluster.region}', msg);
+            }
+          } catch (e) {
+            print('SERVER ERROR: Falha ao processar mensagem: $e');
           }
         },
         onDone: () {
@@ -134,13 +160,20 @@ void main() async {
     String? fileName;
     Uint8List? fileBytes;
 
+    // Drain all parts to ensure the request body is fully consumed
     await for (final part in multipart.parts) {
-      final contentDisposition = part.headers['content-disposition'];
-      if (contentDisposition != null &&
-          contentDisposition.contains('name="image"')) {
-        fileName = 'products/${DateTime.now().millisecondsSinceEpoch}.jpg';
-        fileBytes = await part.readBytes();
-        break;
+      if (fileName == null) {
+        final contentDisposition = part.headers['content-disposition'];
+        if (contentDisposition != null &&
+            contentDisposition.contains('name="image"')) {
+          fileName = 'products/${DateTime.now().millisecondsSinceEpoch}.jpg';
+          fileBytes = await part.readBytes();
+          // Don't break here, we need to drain other parts if they exist
+        } else {
+          await part.drain();
+        }
+      } else {
+        await part.drain();
       }
     }
 
@@ -156,10 +189,16 @@ void main() async {
         size: fileBytes.length,
       );
 
-      // Return the public URL. Note: in production this should be the Nginx proxy URL
-      final baseUrl =
-          Platform.environment['PUBLIC_URL'] ?? 'http://localhost:9000';
-      return Response.ok('$baseUrl/$bucketName/$fileName');
+      // Construct URL dynamically.
+      // Use protocol-relative URLs if possible, or force HTTPS if requested.
+      final host = request.headers['host'] ?? 'localhost:8081';
+      final xProto = request.headers['x-forwarded-proto']?.toLowerCase();
+      final forceHttps =
+          Platform.environment['FORCE_HTTPS']?.toLowerCase() == 'true';
+
+      final proto = (xProto == 'https' || forceHttps) ? 'https' : 'http';
+      final publicUrl = '$proto://$host/storage/$bucketName/$fileName';
+      return Response.ok(publicUrl);
     } catch (e) {
       print('Upload error: $e');
       return Response.internalServerError(body: 'Upload failed: $e');
@@ -171,18 +210,25 @@ void main() async {
       .addMiddleware((innerHandler) {
         return (request) async {
           if (request.method == 'OPTIONS') {
-            return Response.ok('', headers: {
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-              'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
-            });
+            return Response.ok(
+              '',
+              headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers':
+                    'Origin, Content-Type, Authorization',
+              },
+            );
           }
           final response = await innerHandler(request);
-          return response.change(headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
-          });
+          return response.change(
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+              'Access-Control-Allow-Headers':
+                  'Origin, Content-Type, Authorization',
+            },
+          );
         };
       })
       .addHandler(router.call);

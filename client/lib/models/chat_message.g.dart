@@ -22,13 +22,14 @@ class ChatMessageAdapter extends TypeAdapter<ChatMessage> {
       text: fields[2] as String,
       timestamp: fields[3] as DateTime,
       priceUpdate: fields[4] as PriceUpdate?,
+      messageId: fields[5] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ChatMessage obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -38,7 +39,9 @@ class ChatMessageAdapter extends TypeAdapter<ChatMessage> {
       ..writeByte(3)
       ..write(obj.timestamp)
       ..writeByte(4)
-      ..write(obj.priceUpdate);
+      ..write(obj.priceUpdate)
+      ..writeByte(5)
+      ..write(obj.messageId);
   }
 
   @override
@@ -64,6 +67,7 @@ ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => ChatMessage(
       priceUpdate: json['priceUpdate'] == null
           ? null
           : PriceUpdate.fromJson(json['priceUpdate'] as Map<String, dynamic>),
+      messageId: json['messageId'] as String?,
     );
 
 Map<String, dynamic> _$ChatMessageToJson(ChatMessage instance) =>
@@ -73,4 +77,5 @@ Map<String, dynamic> _$ChatMessageToJson(ChatMessage instance) =>
       'text': instance.text,
       'timestamp': instance.timestamp.toIso8601String(),
       'priceUpdate': instance.priceUpdate,
+      'messageId': instance.messageId,
     };

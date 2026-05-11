@@ -54,6 +54,11 @@ dart run bin/server.dart
 ## Federated Network (Beta)
 The Shopping Comparator can now connect to a federated network of WebSocket servers using a central Hub.
 
+### Network Architecture
+- **Hub**: Acts as a central meeting point and message relay for different regions. It **must** have a stable, fixed public URL (e.g., using Cloudflare Tunnel or a dedicated VPS).
+- **Local Servers**: Residential or local instances that connect to the Hub. These can use dynamic URLs (like ngrok) because they initiate the connection to the Hub.
+- **Regions**: Data is synchronized primarily within the same region. Servers in different regions can subscribe to each other's topics via the Hub.
+
 ### Enabling Federation
 Update your `docker-compose.yml` or local environment variables:
 
