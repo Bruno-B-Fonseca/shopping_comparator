@@ -1,4 +1,3 @@
-import 'package:client/services/image_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -62,7 +61,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       return;
     }
 
-    // Se não encontrou localmente, busca no cluster
+    // Se não encontrou localmente, busca no cluster e web
     setState(() {
       _isSearchingCluster = true;
       _currentProduct = null;
@@ -82,7 +81,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     }
 
     if (wsService.currentStatus == WebSocketStatus.connected) {
-      debugPrint('ScanScreen: Solicitando produto $code ao cluster...');
+      debugPrint('ScanScreen: Solicitando produto $code ao cluster e IA...');
       wsService.sendMessage({
         'type': 'product_request',
         'payload': {'barcode': code},
@@ -93,8 +92,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       );
     }
 
-    // Aguarda até 5 segundos por uma resposta
-    for (int i = 0; i < 10; i++) {
+    // Aguarda até 15 segundos por uma resposta (aumentado para dar tempo à IA)
+    for (int i = 0; i < 30; i++) {
       await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
 
@@ -119,24 +118,35 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           (p) => p.barcode == code,
         );
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              pricesExist
-                  ? 'Produto e preço localizados!'
-                  : 'Produto localizado (sem preço recente).',
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                pricesExist
+                    ? 'Produto localizado via cluster/IA!'
+                    : 'Produto localizado (sem preço recente).',
+              ),
             ),
-          ),
-        );
+          );
+        }
         return;
       }
     }
 
-    // Se após 5s não encontrou, abre o cadastro
+    // Se após 15s não encontrou, informa falha
     setState(() {
       _isSearchingCluster = false;
     });
-    _showRegisterDialog(code);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Produto não localizado. Tente novamente ou verifique a conexão.',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _openScanner() async {
@@ -148,114 +158,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     if (barcode != null && mounted) {
       _lookupProduct(barcode);
     }
-  }
-
-  void _syncProduct(Product product) {
-    final wsService = ref.read(webSocketServiceProvider);
-
-    if (wsService.currentStatus == WebSocketStatus.connected) {
-      wsService.sendMessage({
-        'type': 'product_registration',
-        'payload': product.toJson(),
-      });
-      debugPrint('Sync: Produto enviado com sucesso');
-    } else {
-      // Tenta novamente em 2 segundos
-      debugPrint('Sync: Sem conexão, agendando tentativa...');
-      Future.delayed(const Duration(seconds: 2), () => _syncProduct(product));
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Aguardando conexão para sincronizar...'),
-          duration: Duration(seconds: 1),
-        ),
-      );
-    }
-  }
-
-  void _showRegisterDialog(String barcode) {
-    // ... rest of variables
-    final nameController = TextEditingController();
-    final unitController = TextEditingController(text: 'un');
-    final manufacturerController = TextEditingController();
-
-    String? photoUrl; // Variável local para armazenar a URL
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('New Product'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-              ),
-              TextField(
-                controller: unitController,
-                decoration: const InputDecoration(labelText: 'Unit'),
-              ),
-              TextField(
-                controller: manufacturerController,
-                decoration: const InputDecoration(labelText: 'Manufacturer'),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Text('Photo: '),
-                  ProductImagePicker(
-                    onImageUploaded: (url) {
-                      setDialogState(() => photoUrl = url);
-                    },
-                  ),
-                  if (photoUrl != null)
-                    const Icon(Icons.check, color: Colors.green),
-                ],
-              ),
-              if (photoUrl != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Image.network(
-                    ImageService.sanitizeUrl(photoUrl),
-                    height: 100,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const Text('Failed to load preview'),
-                  ),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final product = Product(
-                  barcode: barcode,
-                  name: nameController.text,
-                  unit: unitController.text,
-                  manufacturer: manufacturerController.text,
-                  photoUrl: photoUrl,
-                );
-                StorageService.products.put(barcode, product);
-
-                // Inicia o processo de sincronização com retry
-                _syncProduct(product);
-
-                setState(() {
-                  _currentProduct = product;
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   void _addToCart() async {
@@ -371,16 +273,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             else if (_currentProduct != null) ...[
               Card(
                 child: ListTile(
-                  leading: _currentProduct!.photoUrl != null
-                      ? Image.network(
-                          ImageService.sanitizeUrl(_currentProduct!.photoUrl),
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.image_not_supported),
-                        )
-                      : const Icon(Icons.image),
+                  leading: const CircleAvatar(child: Icon(Icons.shopping_bag)),
                   title: Text(_currentProduct!.name),
                   subtitle: Text(
                     '${_currentProduct!.manufacturer} (${_currentProduct!.unit})',
@@ -396,13 +289,26 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                       builder: (context, box, child) {
                         // Sempre atualiza o controller se o produto atual mudar ou novo preço chegar
                         _updatePriceFromStorage(_currentProduct!.barcode);
-                        return TextField(
-                          controller: _priceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Price',
-                            prefixText: 'R\$ ',
-                          ),
-                          keyboardType: TextInputType.number,
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _priceController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Price',
+                                  prefixText: 'R\$ ',
+                                ),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                            ProductImagePicker(
+                              onPriceDetected: (price) {
+                                setState(() {
+                                  _priceController.text = price.toString();
+                                });
+                              },
+                            ),
+                          ],
                         );
                       },
                     ),

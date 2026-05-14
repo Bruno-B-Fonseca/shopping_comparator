@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+
 import '../providers/cart_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../services/storage_service.dart';
-import '../services/image_service.dart';
 import '../widgets/empty_state_widget.dart';
 
 class CartScreen extends ConsumerWidget {
@@ -86,16 +86,7 @@ class CartScreen extends ConsumerWidget {
                           );
                         },
                         child: ListTile(
-                          leading: product?.photoUrl != null
-                              ? Image.network(
-                                  ImageService.sanitizeUrl(product!.photoUrl),
-                                  width: 40,
-                                  height: 40,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(Icons.image_not_supported),
-                                )
-                              : const Icon(Icons.image),
+                          leading: const Icon(Icons.shopping_bag),
                           title: Text(product?.name ?? 'Unknown Product'),
                           subtitle: Text(
                             '${item.quantity} x ${currencyFormat.format(item.unitPrice)}',

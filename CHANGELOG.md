@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0] - 2026-05-13
+
+### Added
+- **Automated AI Product Registration**: Products are now automatically registered when scanned.
+  - Integration with **Ollama (Qwen)** for local, zero-cost metadata extraction.
+  - Option to use **Gemini 1.5 Flash** as an alternative AI provider.
+  - Automatic web searching for product details based on barcodes.
+  - **Textual Focus**: Decision to focus on highly accurate textual data (name, unit, manufacturer) for better governance.
+- **Backend AI Pipeline**: New services for search and AI extraction.
+- **Frontend Automation**: Removed manual registration dialog; the app now waits for AI-driven WebSocket broadcasts.
+
+### Removed
+- **Product Images**: Removed all image-related functionality (storage, UI, and AI extraction) to streamline the application and ensure data governance.
+
 ## [1.1.0] - 2026-05-11
 
 ### Added

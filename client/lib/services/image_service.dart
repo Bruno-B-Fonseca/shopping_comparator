@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ImageService {
-  static String get _baseUrl {
+  static String get baseUrl {
     if (kIsWeb) {
       final uri = Uri.base;
       final protocol = uri.scheme == 'https' ? 'https' : 'http';
@@ -39,7 +39,7 @@ class ImageService {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('$_baseUrl/products/upload-photo'),
+        Uri.parse('$baseUrl/products/upload-photo'),
       );
 
       if (kIsWeb) {
@@ -52,7 +52,9 @@ class ImageService {
             ),
           );
         } else {
-          throw ArgumentError('imageSource must be Uint8List or List<int> on web');
+          throw ArgumentError(
+            'imageSource must be Uint8List or List<int> on web',
+          );
         }
       } else {
         // No mobile/desktop, we expect a File-like object with a path
@@ -64,7 +66,9 @@ class ImageService {
             await http.MultipartFile.fromPath('image', file.path as String),
           );
         } catch (e) {
-          throw ArgumentError('imageSource must have a valid path on mobile/desktop: $e');
+          throw ArgumentError(
+            'imageSource must have a valid path on mobile/desktop: $e',
+          );
         }
       }
 

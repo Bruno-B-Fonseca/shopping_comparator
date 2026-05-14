@@ -1,8 +1,10 @@
+import 'package:client/providers/websocket_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'services/storage_service.dart';
+
 import 'screens/home_screen.dart';
+import 'services/storage_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,8 +15,36 @@ void main() async {
   runApp(const ProviderScope(child: ShoppingComparatorApp()));
 }
 
-class ShoppingComparatorApp extends StatelessWidget {
+class ShoppingComparatorApp extends ConsumerStatefulWidget {
   const ShoppingComparatorApp({super.key});
+
+  @override
+  ConsumerState<ShoppingComparatorApp> createState() =>
+      _ShoppingComparatorAppState();
+}
+
+class _ShoppingComparatorAppState extends ConsumerState<ShoppingComparatorApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Quando o app volta (ex: após fechar a câmera), garantimos a conexão
+      debugPrint('App resumed: Verificando conectividade WebSocket...');
+      ref.read(webSocketServiceProvider).reconnectIfNeeded();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

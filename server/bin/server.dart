@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:logging/logging.dart';
 import 'package:minio/minio.dart';
 import 'package:server/cluster_service.dart';
+import 'package:server/price_processor.dart';
 import 'package:server/protocol.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as ioshelf;
@@ -15,9 +16,13 @@ import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'package:server/ai_service.dart';
+import 'package:server/product_metadata_service.dart';
+
 // List of connected clients
 final List<WebSocketChannel> _clients = [];
 late ClusterService _cluster;
+late ProductMetadataService _metadataService;
 
 final minio = Minio(
   endPoint: Platform.environment['MINIO_ENDPOINT'] ?? 'localhost',
@@ -35,6 +40,28 @@ void main() async {
 
   final port = int.parse(Platform.environment['PORT'] ?? '3000');
   final hubUrl = Platform.environment['HUB_URL'];
+
+  // Setup AI Metadata Service
+  final aiProvider =
+      Platform.environment['AI_PROVIDER']?.toLowerCase() ?? 'ollama';
+  AIEngine aiEngine;
+  if (aiProvider == 'gemini') {
+    aiEngine = GeminiEngine(
+      apiKey: Platform.environment['GEMINI_API_KEY'] ?? '',
+    );
+  } else {
+    // Default to internal docker service name
+    final ollamaUrl = Platform.environment['OLLAMA_URL'] ?? 'http://ollama:11434';
+    aiEngine = OllamaEngine(
+      baseUrl: ollamaUrl,
+    );
+  }
+
+  _metadataService = ProductMetadataService(
+    aiEngine: aiEngine,
+    minio: minio,
+    bucketName: bucketName,
+  );
 
   if (hubUrl != null) {
     _cluster = ClusterService(
@@ -93,11 +120,12 @@ void main() async {
   }
 
   final router = Router();
+  final priceProcessor = PriceProcessor(aiEngine: aiEngine);
 
   // WebSocket handler
   router.get(
     '/ws',
-    webSocketHandler((webSocket, subprotocol) {
+    (Request request) => webSocketHandler((webSocket, subprotocol) {
       print('New client connected');
       _clients.add(webSocket);
 
@@ -108,11 +136,21 @@ void main() async {
       }));
 
       webSocket.stream.listen(
-        (message) {
+        (message) async {
           try {
             final Map<String, dynamic> msg = jsonDecode(message as String);
             final type = msg[fieldType] ?? 'unknown';
             print('--- SERVER: Recebido [$type] ---');
+
+            // Handle Product Request with AI Fallback
+            if (type == 'product_request') {
+              final payload = msg[fieldPayload];
+              final barcode = payload['barcode'] as String?;
+              if (barcode != null) {
+                // Dispara busca na IA de forma assíncrona
+                _triggerAISearchIfMissing(barcode, request);
+              }
+            }
 
             // Ensure messageId and timestamp exist for deduplication
             msg[fieldMessageId] ??= const Uuid().v4();
@@ -121,7 +159,8 @@ void main() async {
             final encodedMsg = jsonEncode(msg);
 
             // Broadcast locally
-            print('SERVER: Propagando [$type] para ${_clients.length - 1} outros clientes');
+            print(
+                'SERVER: Propagando [$type] para ${_clients.length - 1} outros clientes');
             _broadcast(encodedMsg, exclude: webSocket);
 
             // If not a relay message from hub, publish to cluster
@@ -142,55 +181,97 @@ void main() async {
           _clients.remove(webSocket);
         },
       );
-    }),
+    })(request),
   );
+// ... rest of the code
+
+  // Process Price handler
+  router.post('/products/process-price', (Request request) async {
+    final contentType = request.headers['content-type'];
+    if (contentType == null ||
+        !contentType.toLowerCase().contains('multipart/form-data')) {
+      print('SERVER: Rejecting non-multipart request: $contentType');
+      return Response.badRequest(body: 'Not a multipart request');
+    }
+
+    try {
+      final multipart = request.multipart();
+      if (multipart == null) {
+        return Response.badRequest(body: 'Failed to parse multipart');
+      }
+
+      Uint8List? fileBytes;
+      await for (final part in multipart.parts) {
+        final contentDisposition = part.headers['content-disposition'];
+        if (contentDisposition != null &&
+            contentDisposition.contains('name="image"')) {
+          fileBytes = Uint8List.fromList(await part.readBytes());
+        } else {
+          await part.drain();
+        }
+      }
+
+      if (fileBytes == null) {
+        print('SERVER: Multipart "image" part not found');
+        return Response.badRequest(body: 'Image part not found');
+      }
+
+      final price = await priceProcessor.processImage(fileBytes);
+      if (price != null) {
+        return Response.ok(jsonEncode({'price': price}),
+            headers: {'Content-Type': 'application/json'});
+      } else {
+        return Response.ok(jsonEncode({'price': null, 'error': 'Could not detect price'}),
+            headers: {'Content-Type': 'application/json'});
+      }
+    } catch (e) {
+      print('SERVER ERROR in process-price: $e');
+      return Response.internalServerError(body: 'Multipart processing failed: $e');
+    }
+  });
 
   // Upload handler
   router.post('/products/upload-photo', (Request request) async {
     final contentType = request.headers['content-type'];
-    if (contentType == null || !contentType.contains('multipart/form-data')) {
+    if (contentType == null ||
+        !contentType.toLowerCase().contains('multipart/form-data')) {
+      print('SERVER: Rejecting non-multipart request: $contentType');
       return Response.badRequest(body: 'Not a multipart request');
     }
 
-    final multipart = request.multipart();
-    if (multipart == null) {
-      return Response.badRequest(body: 'Failed to parse multipart');
-    }
+    try {
+      final multipart = request.multipart();
+      if (multipart == null) {
+        return Response.badRequest(body: 'Failed to parse multipart');
+      }
 
-    String? fileName;
-    Uint8List? fileBytes;
+      String? fileName;
+      Uint8List? fileBytes;
 
-    // Drain all parts to ensure the request body is fully consumed
-    await for (final part in multipart.parts) {
-      if (fileName == null) {
+      await for (final part in multipart.parts) {
         final contentDisposition = part.headers['content-disposition'];
-        if (contentDisposition != null &&
+        if (fileBytes == null &&
+            contentDisposition != null &&
             contentDisposition.contains('name="image"')) {
           fileName = 'products/${DateTime.now().millisecondsSinceEpoch}.jpg';
-          fileBytes = await part.readBytes();
-          // Don't break here, we need to drain other parts if they exist
+          fileBytes = Uint8List.fromList(await part.readBytes());
         } else {
           await part.drain();
         }
-      } else {
-        await part.drain();
       }
-    }
 
-    if (fileName == null || fileBytes == null) {
-      return Response.badRequest(body: 'Image part not found');
-    }
+      if (fileBytes == null) {
+        print('SERVER: Multipart "image" part not found');
+        return Response.badRequest(body: 'Image part not found');
+      }
 
-    try {
       await minio.putObject(
         bucketName,
-        fileName,
+        fileName!,
         Stream.value(fileBytes),
         size: fileBytes.length,
       );
 
-      // Construct URL dynamically.
-      // Use protocol-relative URLs if possible, or force HTTPS if requested.
       final host = request.headers['host'] ?? 'localhost:8081';
       final xProto = request.headers['x-forwarded-proto']?.toLowerCase();
       final forceHttps =
@@ -198,9 +279,10 @@ void main() async {
 
       final proto = (xProto == 'https' || forceHttps) ? 'https' : 'http';
       final publicUrl = '$proto://$host/storage/$bucketName/$fileName';
+      print('SERVER: Upload concluído: $publicUrl');
       return Response.ok(publicUrl);
     } catch (e) {
-      print('Upload error: $e');
+      print('SERVER ERROR in upload-photo: $e');
       return Response.internalServerError(body: 'Upload failed: $e');
     }
   });
@@ -245,6 +327,34 @@ void _broadcast(dynamic message, {dynamic exclude}) {
       } catch (e) {
         print('Failed to send message: $e');
       }
+    }
+  }
+}
+
+/// Helper to trigger AI search if a product is not found after a short delay.
+void _triggerAISearchIfMissing(String barcode, Request request) async {
+  // Wait a bit to see if another server in the cluster responds
+  await Future.delayed(const Duration(seconds: 3));
+
+  // In a real scenario, we'd check a local cache/DB here. 
+  // For this MVP, the "source of truth" is the broadcast, 
+  // so we'll just proceed with AI search if we want to be proactive.
+  
+  final metadata = await _metadataService.fetchAndRegisterProduct(barcode);
+  if (metadata != null) {
+    final registrationMsg = {
+      fieldType: 'product_registration',
+      fieldPayload: metadata,
+      fieldMessageId: const Uuid().v4(),
+      fieldTimestamp: DateTime.now().toIso8601String(),
+    };
+
+    print('AI: Cadastro automático concluído para $barcode. Transmitindo...');
+    final encoded = jsonEncode(registrationMsg);
+    _broadcast(encoded);
+    
+    if (Platform.environment['HUB_URL'] != null) {
+      _cluster.publish('region/${_cluster.region}', registrationMsg);
     }
   }
 }

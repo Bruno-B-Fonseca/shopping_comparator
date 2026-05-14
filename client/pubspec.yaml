@@ -49,6 +49,7 @@ dependencies:
   image_picker: ^1.2.2
   image_editor_plus: ^1.0.8
   http: ^1.6.0
+  google_mlkit_text_recognition: ^0.15.1
 
 dev_dependencies:
   flutter_test:

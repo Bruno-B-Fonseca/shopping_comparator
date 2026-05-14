@@ -26,9 +26,19 @@ services:
       - MINIO_ROOT_PASSWORD=password
       - PUBLIC_URL=${PUBLIC_URL:-http://localhost:9000}
       - FORCE_HTTPS=true
+      - AI_PROVIDER=${AI_PROVIDER:-ollama}
+      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - hub
       - minio
+      - ollama
+    restart: always
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
     restart: always
 
   minio:
@@ -70,3 +80,4 @@ services:
 
 volumes:
   minio_data:
+  ollama_data:

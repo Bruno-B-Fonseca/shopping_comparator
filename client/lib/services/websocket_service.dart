@@ -93,6 +93,16 @@ class WebSocketService {
     });
   }
 
+  /// Força uma verificação de conexão e tenta reconectar imediatamente se estiver desconectado.
+  void reconnectIfNeeded() {
+    if (_currentStatus == WebSocketStatus.disconnected && _lastUrl != null) {
+      debugPrint('WebSocket: Reconexão forçada solicitada.');
+      _reconnectTimer?.cancel();
+      _reconnectAttempts = 0; // Reseta o backoff para conectar rápido
+      connect(_lastUrl!);
+    }
+  }
+
   void sendMessage(Map<String, dynamic> message) {
     if (_channel != null && _currentStatus == WebSocketStatus.connected) {
       try {
