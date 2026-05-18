@@ -149,54 +149,82 @@ void main() async {
             final type = msg[fieldType] ?? 'unknown';
             print('--- SERVER: Recebido [$type] ---');
 
+            // --- SEGURANÇA: Sanitização Global ---
+            // NUNCA permite que o cliente envie sua própria flag isOfficial no payload
+            if (msg[fieldPayload] is Map) {
+              msg[fieldPayload].remove('isOfficial');
+            }
+            msg.remove('isOfficial');
+
+            final String locationPassword =
+                Platform.environment['LOCATION_PASSWORD'] ?? '';
+
+            // Handle Authentication Verification
+            if (type == msgAuthVerifyRequest) {
+              final signature = msg[fieldSignature] as String?;
+              final nonce = msg[fieldNonce] as String?;
+
+              if (signature != null && nonce != null) {
+                final key = utf8.encode(locationPassword);
+                final hmac = Hmac(sha256, key);
+                final expectedSignature = hmac.convert(utf8.encode(nonce)).toString();
+
+                final success = signature == expectedSignature && locationPassword.isNotEmpty;
+                webSocket.sink.add(jsonEncode({
+                  fieldType: msgAuthVerifyResponse,
+                  fieldPayload: {'success': success},
+                }));
+                print('SERVER: Verificação de credenciais: ${success ? 'SUCESSO' : 'FALHA'}');
+              }
+              return;
+            }
+
             // Handle Product Request with AI Fallback
             if (type == 'product_request') {
               final payload = msg[fieldPayload];
               final barcode = payload['barcode'] as String?;
               if (barcode != null) {
-                // Dispara busca na IA de forma assíncrona
                 _triggerAISearchIfMissing(barcode, request);
               }
             }
 
-            // ... (variáveis globais)
-            final String locationPassword =
-                Platform.environment['LOCATION_PASSWORD'] ?? '';
+            // Lógica de autenticação para tipos críticos
+            final criticalTypes = [
+              'chat_message',
+              'promotion',
+              'product_registration',
+              'location_registration',
+              'price_update'
+            ];
 
-            // ... (dentro do listen do webSocket)
-            // Lógica de autenticação para postagens no chat/promoções
-            if (type == 'chat_message' || type == 'promotion') {
+            if (criticalTypes.contains(type)) {
               final signature = msg[fieldSignature] as String?;
               final timestamp = msg[fieldTimestamp] as String?;
               final messageId = msg[fieldMessageId] as String?;
 
-              // Se a mensagem for assinada, validamos se é oficial.
-              // Se não for assinada, tratamos como mensagem de usuário comum (isOfficial = false).
-              if (signature != null && timestamp != null && messageId != null) {
+              if (signature != null && timestamp != null && messageId != null && locationPassword.isNotEmpty) {
                 // Validar assinatura HMAC
                 final payloadString = jsonEncode(msg[fieldPayload]);
                 final key = utf8.encode(locationPassword);
                 final messageToSign = '$payloadString$timestamp$messageId';
                 final hmac = Hmac(sha256, key);
-                final expectedSignature = hmac
-                    .convert(utf8.encode(messageToSign))
-                    .toString();
+                final expectedSignature = hmac.convert(utf8.encode(messageToSign)).toString();
 
                 if (signature == expectedSignature) {
                   msg['isOfficial'] = true;
+                  if (msg[fieldPayload] is Map) {
+                    msg[fieldPayload]['isOfficial'] = true;
+                  }
                 } else {
-                  print('SERVER: Assinatura inválida para $type');
-                  webSocket.sink.add(
-                    jsonEncode({
-                      fieldType: msgError,
-                      fieldMessage: 'Assinatura inválida',
-                    }),
-                  );
-                  return; // Descarta a mensagem com assinatura inválida
+                  print('SERVER: Assinatura inválida para $type (SPOOFING ATTEMPTED)');
+                  msg['isOfficial'] = false;
+                  // Se for promoção, descarta
+                  if (type == 'promotion') return;
                 }
               } else {
-                // Mensagem não assinada, considerada usuário comum
                 msg['isOfficial'] = false;
+                // Se for promoção ou registro obrigatório oficial, descarta sem assinatura
+                if (type == 'promotion') return;
               }
             } else {
               msg['isOfficial'] = false;

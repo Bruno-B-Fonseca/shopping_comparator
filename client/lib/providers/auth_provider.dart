@@ -1,8 +1,9 @@
+import 'package:client/providers/websocket_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier();
+  return AuthNotifier(ref);
 });
 
 class AuthState {
@@ -30,7 +31,8 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier() : super(AuthState(isOperator: false)) {
+  final Ref ref;
+  AuthNotifier(this.ref) : super(AuthState(isOperator: false)) {
     loadCredentials();
   }
 
@@ -56,6 +58,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
       locationId: id,
       locationPassword: password,
     );
+  }
+
+  Future<bool> verifyAndSetCredentials(String id, String password) async {
+    final success = await ref.read(webSocketServiceProvider).verifyCredentials(id, password);
+    
+    if (success) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('location_id', id);
+      await prefs.setString('location_password', password);
+      
+      state = AuthState(
+        isOperator: true,
+        locationId: id,
+        locationPassword: password,
+      );
+    }
+    
+    return success;
   }
 
   Future<void> clearCredentials() async {

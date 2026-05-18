@@ -15,6 +15,8 @@ const String msgSyncResponse = 'sync_response';
 /// Novos tipos de mensagem para autenticação HMAC
 const String msgAuthChallenge = 'auth_challenge';
 const String msgAuthResponse = 'auth_response';
+const String msgAuthVerifyRequest = 'auth_verify_request';
+const String msgAuthVerifyResponse = 'auth_verify_response';
 
 /// Campos comuns existentes
 const String fieldType = 'type';

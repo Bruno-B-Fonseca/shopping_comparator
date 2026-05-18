@@ -6,6 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+const String msgAuthVerifyRequest = 'auth_verify_request';
+const String msgAuthVerifyResponse = 'auth_verify_response';
+const String fieldType = 'type';
+const String fieldPayload = 'payload';
+const String fieldSignature = 'signature';
+const String fieldNonce = 'nonce';
+
 enum WebSocketStatus { connected, disconnected, connecting }
 
 class WebSocketService {
@@ -24,6 +31,42 @@ class WebSocketService {
   int _reconnectAttempts = 0;
   Timer? _reconnectTimer;
   String? _lastUrl;
+
+  Future<bool> verifyCredentials(String id, String password) async {
+    if (_currentStatus != WebSocketStatus.connected) return false;
+
+    final completer = Completer<bool>();
+    final nonce = const Uuid().v4();
+
+    // Calcular assinatura para o nonce
+    final key = utf8.encode(password);
+    final hmac = Hmac(sha256, key);
+    final signature = hmac.convert(utf8.encode(nonce)).toString();
+
+    // Escuta temporária pela resposta
+    StreamSubscription? sub;
+    sub = messages.listen((data) {
+      if (data[fieldType] == msgAuthVerifyResponse) {
+        final success = data[fieldPayload]['success'] == true;
+        sub?.cancel();
+        if (!completer.isCompleted) completer.complete(success);
+      }
+    });
+
+    // Timeout após 5 segundos
+    Future.delayed(const Duration(seconds: 5), () {
+      sub?.cancel();
+      if (!completer.isCompleted) completer.complete(false);
+    });
+
+    sendMessage({
+      fieldType: msgAuthVerifyRequest,
+      fieldNonce: nonce,
+      fieldSignature: signature,
+    });
+
+    return completer.future;
+  }
 
   Future<void> sendAuthenticatedMessage(Map<String, dynamic> message) async {
     final type = message['type'] as String?;

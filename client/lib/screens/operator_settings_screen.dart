@@ -32,17 +32,43 @@ class _OperatorSettingsScreenState
   }
 
   Future<void> _saveCredentials() async {
+    final id = _idController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (id.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, preencha o ID e a Senha')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      await ref.read(authProvider.notifier).setCredentials(
-            _idController.text.trim(),
-            _passwordController.text.trim(),
+      final success = await ref.read(authProvider.notifier).verifyAndSetCredentials(
+            id,
+            password,
           );
+          
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Credenciais validadas e salvas com sucesso!')),
+          );
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Falha na autenticação: ID ou Senha inválidos para este servidor.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Credenciais salvas com sucesso!')),
+          SnackBar(content: Text('Erro ao conectar com o servidor: $e')),
         );
-        Navigator.pop(context);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
