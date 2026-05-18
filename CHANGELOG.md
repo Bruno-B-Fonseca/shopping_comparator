@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.3.0] - 2026-05-18
+
+### Added
+- **LGPD Compliance**: Implemented comprehensive data privacy features.
+  - Mandatory privacy policy acknowledgment on startup.
+  - Dedicated **Privacy Policy** screen accessible in-app.
+  - Granular consent management for **Location Sharing** and **AI Image Processing**.
+  - **AES-256 Encryption** for all local storage (Hive boxes) ensuring data security in rest.
+  - Data management tools: "Apagar histórico local" and "Resetar consentimentos".
+- **Hierarchical Federation**: Refined the federated network with secure authentication.
+  - **HMAC-SHA256 signatures** for official messages between Cluster and Hub.
+  - Support for cross-hub synchronization (upstream relay).
+- **Technical Improvements**:
+  - Enhanced Tesseract OCR processing with isolated temporary directories.
+  - Improved logging for Hub and Cluster service debugging.
+  - Flexible WebSocket messaging allowing unofficial chat content.
+
+### Fixed
+- Fixed Hub Dockerfile to properly include configuration secrets.
+- Updated public tunnel URLs for development environments.
+- Corrected race conditions in Tesseract temporary file cleanup.
+
 ## [1.2.0] - 2026-05-13
 
 ### Added
