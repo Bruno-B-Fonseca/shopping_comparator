@@ -45,6 +45,7 @@ class ClusterService {
 
     _hubChannel.stream.listen(
       (message) {
+        _log.info('Received from Hub: $message');
         final msg = jsonDecode(message as String);
         _handleHubMessage(msg);
       },

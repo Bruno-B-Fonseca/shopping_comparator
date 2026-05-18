@@ -170,42 +170,35 @@ void main() async {
               final timestamp = msg[fieldTimestamp] as String?;
               final messageId = msg[fieldMessageId] as String?;
 
-              if (signature == null || timestamp == null || messageId == null) {
-                print('SERVER: Bloqueando mensagem não assinada de $type');
-                webSocket.sink.add(
-                  jsonEncode({
-                    fieldType: msgError,
-                    fieldMessage: 'Autenticação necessária',
-                  }),
-                );
-                return; // Descarta a mensagem
+              // Se a mensagem for assinada, validamos se é oficial.
+              // Se não for assinada, tratamos como mensagem de usuário comum (isOfficial = false).
+              if (signature != null && timestamp != null && messageId != null) {
+                // Validar assinatura HMAC
+                final payloadString = jsonEncode(msg[fieldPayload]);
+                final key = utf8.encode(locationPassword);
+                final messageToSign = '$payloadString$timestamp$messageId';
+                final hmac = Hmac(sha256, key);
+                final expectedSignature = hmac
+                    .convert(utf8.encode(messageToSign))
+                    .toString();
+
+                if (signature == expectedSignature) {
+                  msg['isOfficial'] = true;
+                } else {
+                  print('SERVER: Assinatura inválida para $type');
+                  webSocket.sink.add(
+                    jsonEncode({
+                      fieldType: msgError,
+                      fieldMessage: 'Assinatura inválida',
+                    }),
+                  );
+                  return; // Descarta a mensagem com assinatura inválida
+                }
+              } else {
+                // Mensagem não assinada, considerada usuário comum
+                msg['isOfficial'] = false;
               }
-
-              // Validar assinatura HMAC
-              final payloadString = jsonEncode(msg[fieldPayload]);
-              final key = utf8.encode(locationPassword);
-              final messageToSign = '$payloadString$timestamp$messageId';
-              final hmac = Hmac(sha256, key);
-              final expectedSignature = hmac
-                  .convert(utf8.encode(messageToSign))
-                  .toString();
-
-              if (signature != expectedSignature) {
-                print('SERVER: Assinatura inválida para $type');
-                webSocket.sink.add(
-                  jsonEncode({
-                    fieldType: msgError,
-                    fieldMessage: 'Assinatura inválida',
-                  }),
-                );
-                return;
-              }
-
-              // Se passou, marca como oficial
-              msg['isOfficial'] = true;
             } else {
-              // Mensagens de usuário comum (ex: chat geral não oficial) não precisam de assinatura
-              // ou podem ter isOfficial = false
               msg['isOfficial'] = false;
             }
 

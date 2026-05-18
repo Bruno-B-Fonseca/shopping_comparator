@@ -11,6 +11,7 @@ RUN dart compile exe bin/hub.dart -o /app/bin/hub
 FROM scratch
 COPY --from=build /runtime/ /
 COPY --from=build /app/bin/hub /app/bin/hub
+COPY --from=build /app/config /config
 
 EXPOSE 3001
 CMD ["/app/bin/hub"]

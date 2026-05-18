@@ -30,26 +30,27 @@ class PriceProcessor {
   }
 
   Future<double?> _processWithTesseract(Uint8List imageBytes) async {
-    final tempImage = File('temp_label.jpg');
-    await tempImage.writeAsBytes(imageBytes);
-    final tempText = File('temp_label.txt');
+    final tempDir = await Directory.systemTemp.createTemp('tesseract_');
+    final tempImage = File('${tempDir.path}/label.jpg');
+    final tempText = File('${tempDir.path}/label');
 
     try {
+      await tempImage.writeAsBytes(imageBytes);
+
       final result = await Process.run('tesseract', [
         tempImage.path,
-        'temp_label',
+        tempText.path,
         '-l', 'por',
       ]);
 
       if (result.exitCode != 0) return null;
 
-      final text = await tempText.readAsString();
+      final text = await File('${tempText.path}.txt').readAsString();
       return _parsePrice(text);
     } catch (e) {
       return null;
     } finally {
-      if (await tempImage.exists()) await tempImage.delete();
-      if (await tempText.exists()) await tempText.delete();
+      if (await tempDir.exists()) await tempDir.delete(recursive: true);
     }
   }
 

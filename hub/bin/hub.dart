@@ -201,6 +201,7 @@ void _handleMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
       final signature = msg[fieldSignature] as String;
       final secrets = _loadSecrets();
       final expectedPassword = secrets[locationId];
+      _log.info("Checking password for $locationId, got: $expectedPassword");
       if (expectedPassword == null) {
         _sendError(channel, 'Location not authorized');
         return;
