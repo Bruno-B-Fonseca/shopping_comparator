@@ -175,24 +175,43 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     // Registrar atualização de preço se houver localização
     final position = await LocationService.getCurrentPosition();
     if (position != null) {
-      final locationId =
-          '${position.latitude.toStringAsFixed(4)}_${position.longitude.toStringAsFixed(4)}';
+      final double lat = position.latitude;
+      final double lng = position.longitude;
 
-      // Salva localização se não existir
-      if (!StorageService.locations.containsKey(locationId)) {
-        final loc = LocationModel(
-          id: locationId,
-          name: 'Supermercado Próximo',
-          latitude: position.latitude,
-          longitude: position.longitude,
+      // 1. Tenta encontrar um estabelecimento já cadastrado com perímetro (geofence)
+      LocationModel? matchedLocation;
+      try {
+        matchedLocation = StorageService.locations.values.firstWhere(
+          (loc) => loc.contains(lat, lng),
         );
-        StorageService.locations.put(locationId, loc);
+      } catch (_) {
+        // Nenhum local cadastrado contém esta coordenada
+      }
 
-        // Sincroniza localização
-        ref.read(webSocketServiceProvider).sendMessage({
-          'type': 'location_registration',
-          'payload': loc.toJson(),
-        });
+      String locationId;
+      bool shouldShare = false;
+
+      if (matchedLocation != null) {
+        locationId = matchedLocation.id;
+        shouldShare = true; // Só compartilha se for local oficial
+        debugPrint(
+          'Geofence: Localizado estabelecimento oficial "${matchedLocation.name}"',
+        );
+      } else {
+        // 2. Fallback: Localização privada (não compartilhada)
+        locationId = 'private_${lat.toStringAsFixed(4)}_${lng.toStringAsFixed(4)}';
+
+        if (!StorageService.locations.containsKey(locationId)) {
+          final loc = LocationModel(
+            id: locationId,
+            name: 'Local Não Registrado',
+            latitude: lat,
+            longitude: lng,
+          );
+          StorageService.locations.put(locationId, loc);
+          // NÃO sincroniza localização privada
+        }
+        debugPrint('Geofence: Local fora de área oficial. Preço será privado.');
       }
 
       final priceUpdate = PriceUpdate(
@@ -207,12 +226,14 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         priceUpdate,
       );
 
-      // Sincroniza preço
-      ref.read(webSocketServiceProvider).sendMessage({
-        'type': 'price_update',
-        'payload': priceUpdate.toJson(),
-      });
-      debugPrint('Sync: Preço sincronizado com o cluster');
+      // Sincroniza preço APENAS se for local oficial
+      if (shouldShare) {
+        ref.read(webSocketServiceProvider).sendMessage({
+          'type': 'price_update',
+          'payload': priceUpdate.toJson(),
+        });
+        debugPrint('Sync: Preço oficial sincronizado com o cluster');
+      }
     }
 
     final cartItem = CartItem(
@@ -232,9 +253,11 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       _currentProduct = null;
     });
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Added to cart')));
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Added to cart')));
+    }
   }
 
   @override
@@ -275,9 +298,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 child: ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.shopping_bag)),
                   title: Text(_currentProduct!.name),
-                  subtitle: Text(
-                    '${_currentProduct!.manufacturer} (${_currentProduct!.unit})',
-                  ),
+                  subtitle: Text('by ${_currentProduct!.manufacturer}'),
                 ),
               ),
               const SizedBox(height: 20),

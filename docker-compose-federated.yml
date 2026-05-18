@@ -29,6 +29,8 @@ services:
       - AI_PROVIDER=${AI_PROVIDER:-ollama}
       - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LOCATION_ID=${LOCATION_ID}
+      - LOCATION_PASSWORD=${LOCATION_PASSWORD}
     depends_on:
       - hub
       - minio
@@ -65,18 +67,17 @@ services:
       - websocket
       - minio
 
-  ngrok:
-    image: ngrok/ngrok:latest
+  tunnel:
+    image: cloudflare/cloudflared:latest
     environment:
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
-    command:
-      - "http"
-      - "web:80"
-    ports:
-      - "4040:4040"
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    # cloudflared é distroless (não tem sh). Se o token existir, ele ignora --url.
+    # Mas como o binário não aceita lógica condicional complexa sem shell,
+    # vamos usar o comando padrão para URL temporária.
+    command: tunnel --url http://web:80 --no-autoupdate
+    restart: always
     depends_on:
       - web
-    restart: always
 
 volumes:
   minio_data:

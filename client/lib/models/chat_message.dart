@@ -25,6 +25,27 @@ class ChatMessage extends HiveObject {
   @HiveField(5)
   final String? messageId;
 
+  @HiveField(6)
+  final String? locationId;
+
+  @HiveField(7)
+  final bool isOfficial;
+
+  @HiveField(8)
+  final bool isPromotion;
+
+  @HiveField(9)
+  final String? title;
+
+  @HiveField(10)
+  final String? description;
+
+  @HiveField(11)
+  final String? bannerUrl;
+
+  @HiveField(12)
+  final double? price;
+
   ChatMessage({
     required this.id,
     required this.sender,
@@ -32,6 +53,13 @@ class ChatMessage extends HiveObject {
     required this.timestamp,
     this.priceUpdate,
     this.messageId,
+    this.locationId,
+    this.isOfficial = false,
+    this.isPromotion = false,
+    this.title,
+    this.description,
+    this.bannerUrl,
+    this.price,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) =>

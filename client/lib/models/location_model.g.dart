@@ -21,14 +21,18 @@ class LocationModelAdapter extends TypeAdapter<LocationModel> {
       name: fields[1] as String,
       latitude: fields[2] as double,
       longitude: fields[3] as double,
-      photoBase64: fields[4] as String?,
+      logoUrl: fields[4] as String?,
+      minLat: fields[5] as double?,
+      maxLat: fields[6] as double?,
+      minLong: fields[7] as double?,
+      maxLong: fields[8] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, LocationModel obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -38,7 +42,15 @@ class LocationModelAdapter extends TypeAdapter<LocationModel> {
       ..writeByte(3)
       ..write(obj.longitude)
       ..writeByte(4)
-      ..write(obj.photoBase64);
+      ..write(obj.logoUrl)
+      ..writeByte(5)
+      ..write(obj.minLat)
+      ..writeByte(6)
+      ..write(obj.maxLat)
+      ..writeByte(7)
+      ..write(obj.minLong)
+      ..writeByte(8)
+      ..write(obj.maxLong);
   }
 
   @override
@@ -62,7 +74,11 @@ LocationModel _$LocationModelFromJson(Map<String, dynamic> json) =>
       name: json['name'] as String,
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
-      photoBase64: json['photoBase64'] as String?,
+      logoUrl: json['logoUrl'] as String?,
+      minLat: (json['minLat'] as num?)?.toDouble(),
+      maxLat: (json['maxLat'] as num?)?.toDouble(),
+      minLong: (json['minLong'] as num?)?.toDouble(),
+      maxLong: (json['maxLong'] as num?)?.toDouble(),
     );
 
 Map<String, dynamic> _$LocationModelToJson(LocationModel instance) =>
@@ -71,5 +87,9 @@ Map<String, dynamic> _$LocationModelToJson(LocationModel instance) =>
       'name': instance.name,
       'latitude': instance.latitude,
       'longitude': instance.longitude,
-      'photoBase64': instance.photoBase64,
+      'logoUrl': instance.logoUrl,
+      'minLat': instance.minLat,
+      'maxLat': instance.maxLat,
+      'minLong': instance.minLong,
+      'maxLong': instance.maxLong,
     };

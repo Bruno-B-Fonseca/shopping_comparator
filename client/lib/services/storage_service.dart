@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/product.dart';
 import '../models/location_model.dart';
@@ -16,12 +17,23 @@ class StorageService {
     Hive.registerAdapter(CartItemAdapter());
     Hive.registerAdapter(ChatMessageAdapter());
 
-    // Open Boxes
-    await Hive.openBox<Product>('products');
-    await Hive.openBox<LocationModel>('locations');
-    await Hive.openBox<PriceUpdate>('prices');
-    await Hive.openBox<CartItem>('cart');
-    await Hive.openBox<ChatMessage>('messages');
+    // Open Boxes with fail-safe logic
+    await _openBoxSafe<Product>('products');
+    await _openBoxSafe<LocationModel>('locations');
+    await _openBoxSafe<PriceUpdate>('prices');
+    await _openBoxSafe<CartItem>('cart');
+    await _openBoxSafe<ChatMessage>('messages');
+  }
+
+  static Future<void> _openBoxSafe<T>(String name) async {
+    try {
+      await Hive.openBox<T>(name);
+    } catch (e) {
+      // Se falhar ao abrir (provavelmente erro de versão/schema), limpa a box e tenta de novo
+      debugPrint('StorageService: Erro ao abrir box "$name". Resetando dados... Error: $e');
+      await Hive.deleteBoxFromDisk(name);
+      await Hive.openBox<T>(name);
+    }
   }
 
   // Getters for boxes

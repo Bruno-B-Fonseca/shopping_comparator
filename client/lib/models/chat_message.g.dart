@@ -23,13 +23,20 @@ class ChatMessageAdapter extends TypeAdapter<ChatMessage> {
       timestamp: fields[3] as DateTime,
       priceUpdate: fields[4] as PriceUpdate?,
       messageId: fields[5] as String?,
+      locationId: fields[6] as String?,
+      isOfficial: fields[7] as bool,
+      isPromotion: fields[8] as bool,
+      title: fields[9] as String?,
+      description: fields[10] as String?,
+      bannerUrl: fields[11] as String?,
+      price: fields[12] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ChatMessage obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,7 +48,21 @@ class ChatMessageAdapter extends TypeAdapter<ChatMessage> {
       ..writeByte(4)
       ..write(obj.priceUpdate)
       ..writeByte(5)
-      ..write(obj.messageId);
+      ..write(obj.messageId)
+      ..writeByte(6)
+      ..write(obj.locationId)
+      ..writeByte(7)
+      ..write(obj.isOfficial)
+      ..writeByte(8)
+      ..write(obj.isPromotion)
+      ..writeByte(9)
+      ..write(obj.title)
+      ..writeByte(10)
+      ..write(obj.description)
+      ..writeByte(11)
+      ..write(obj.bannerUrl)
+      ..writeByte(12)
+      ..write(obj.price);
   }
 
   @override
@@ -68,6 +89,13 @@ ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => ChatMessage(
           ? null
           : PriceUpdate.fromJson(json['priceUpdate'] as Map<String, dynamic>),
       messageId: json['messageId'] as String?,
+      locationId: json['locationId'] as String?,
+      isOfficial: json['isOfficial'] as bool? ?? false,
+      isPromotion: json['isPromotion'] as bool? ?? false,
+      title: json['title'] as String?,
+      description: json['description'] as String?,
+      bannerUrl: json['bannerUrl'] as String?,
+      price: (json['price'] as num?)?.toDouble(),
     );
 
 Map<String, dynamic> _$ChatMessageToJson(ChatMessage instance) =>
@@ -78,4 +106,11 @@ Map<String, dynamic> _$ChatMessageToJson(ChatMessage instance) =>
       'timestamp': instance.timestamp.toIso8601String(),
       'priceUpdate': instance.priceUpdate,
       'messageId': instance.messageId,
+      'locationId': instance.locationId,
+      'isOfficial': instance.isOfficial,
+      'isPromotion': instance.isPromotion,
+      'title': instance.title,
+      'description': instance.description,
+      'bannerUrl': instance.bannerUrl,
+      'price': instance.price,
     };

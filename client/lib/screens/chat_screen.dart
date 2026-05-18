@@ -1,194 +1,291 @@
-import 'package:client/models/price_update.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-
 import '../models/chat_message.dart';
 import '../providers/websocket_provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/storage_service.dart';
+import '../services/image_service.dart';
+import '../widgets/product_image_picker.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
-  const ChatScreen({super.key});
+  final String locationId;
+  final String locationName;
+
+  const ChatScreen({
+    super.key,
+    required this.locationId,
+    required this.locationName,
+  });
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
-  final _messageController = TextEditingController();
   final List<ChatMessage> _chatHistory = [];
 
   @override
   void initState() {
     super.initState();
-    // Load local history
-    _chatHistory.addAll(StorageService.messages.values.toList());
-    _chatHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    _loadHistory();
   }
 
-  void _sendMessage() {
-    final text = _messageController.text.trim();
-    if (text.isEmpty) return;
-
-    final msg = ChatMessage(
-      id: const Uuid().v4(),
-      sender: 'User', // Local user name
-      text: text,
-      timestamp: DateTime.now(),
-      messageId: const Uuid().v4(),
-    );
-
-    _addMessage(msg);
-    
-    // Envia no formato estruturado para o SyncService dos outros clientes
-    ref.read(webSocketServiceProvider).sendMessage({
-      'type': 'chat_message',
-      'payload': msg.toJson(),
+  void _loadHistory() {
+    final history = StorageService.messages.values
+        .where((m) => m.locationId == widget.locationId)
+        .toList();
+    history.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    setState(() {
+      _chatHistory.clear();
+      _chatHistory.addAll(history);
     });
-    
-    _messageController.clear();
   }
 
   void _addMessage(ChatMessage msg) {
-    // Evita duplicatas se já estiver no histórico
+    if (msg.locationId != widget.locationId) return;
+
     final msgId = msg.messageId ?? msg.id;
-    if (_chatHistory.any((m) => (m.messageId ?? m.id) == msgId)) {
-      return;
-    }
+    if (_chatHistory.any((m) => (m.messageId ?? m.id) == msgId)) return;
 
     setState(() {
-      _chatHistory.add(msg);
+      _chatHistory.insert(0, msg);
     });
     StorageService.messages.add(msg);
+  }
 
-    // Se for um update de preço, salva também no box de preços
-    if (msg.priceUpdate != null) {
-      final priceUpdate = msg.priceUpdate!;
-      // Garante que o PriceUpdate tenha o mesmo messageId da mensagem de chat
-      final priceWithId = PriceUpdate(
-        barcode: priceUpdate.barcode,
-        locationId: priceUpdate.locationId,
-        price: priceUpdate.price,
-        timestamp: priceUpdate.timestamp,
-        messageId: msg.messageId ?? msg.id,
-      );
-
-      StorageService.prices.put(
-        '${priceWithId.barcode}_${priceWithId.locationId}',
-        priceWithId,
-      );
-    }
+  void _showPromotionForm() {
+    showDialog(
+      context: context,
+      builder: (context) => _PromotionForm(
+        locationId: widget.locationId,
+        onPost: (msg) {
+          _addMessage(msg);
+          ref.read(webSocketServiceProvider).sendAuthenticatedMessage({
+            'type': 'chat_message',
+            'payload': msg.toJson(),
+          });
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Listen for incoming messages
+    final auth = ref.watch(authProvider);
+    final isOperator = auth.isOperator && auth.locationId == widget.locationId;
+
     ref.listen(webSocketMessagesProvider, (previous, next) {
       next.whenData((data) {
-        final String? type = data['type'];
-        
-        if (type == 'chat_message') {
-          // Novo formato estruturado
-          final msg = ChatMessage.fromJson(data['payload']);
-          _addMessage(msg);
-        } else if (type == null && data.containsKey('sender')) {
-          // Compatibilidade com formato antigo
-          final msg = ChatMessage.fromJson(data);
-          _addMessage(msg);
+        if (data['type'] == 'chat_message' || data['type'] == 'relay') {
+          final payload = data['type'] == 'relay'
+              ? data['payload']['payload']
+              : data['payload'];
+          if (payload != null) {
+            _addMessage(ChatMessage.fromJson(payload));
+          }
         }
       });
     });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Group Chat')),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              reverse: true,
+      appBar: AppBar(
+        title: Text(widget.locationName),
+        actions: [
+          if (isOperator)
+            IconButton(
+              icon: const Icon(Icons.add_business),
+              tooltip: 'Nova Promoção',
+              onPressed: _showPromotionForm,
+            ),
+        ],
+      ),
+      body: _chatHistory.isEmpty
+          ? const Center(
+              child: Text('Nenhuma oferta postada ainda.'),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
               itemCount: _chatHistory.length,
               itemBuilder: (context, index) {
-                final msg = _chatHistory[_chatHistory.length - 1 - index];
-                final isMe = msg.sender == 'User';
-
-                return Align(
-                  alignment: isMe
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(
-                      vertical: 4,
-                      horizontal: 8,
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isMe
-                          ? Theme.of(context).colorScheme.primaryContainer
-                          : Theme.of(context).colorScheme.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (!isMe)
-                          Text(
-                            msg.sender,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        Text(msg.text),
-                        if (msg.priceUpdate != null) ...[
-                          const Divider(),
-                          const Text(
-                            'PRICE UPDATE',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'R\$ ${msg.priceUpdate!.price.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                        Text(
-                          '${msg.timestamp.hour}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
+                final msg = _chatHistory[index];
+                return _PromotionCard(message: msg);
               },
             ),
-          ),
+    );
+  }
+}
+
+class _PromotionCard extends StatelessWidget {
+  final ChatMessage message;
+
+  const _PromotionCard({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      clipBehavior: Clip.antiAlias,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (message.bannerUrl != null)
+            Image.network(
+              ImageService.sanitizeUrl(message.bannerUrl!),
+              height: 200,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                height: 200,
+                color: colorScheme.surfaceContainerHighest,
+                child: const Icon(Icons.broken_image, size: 64),
+              ),
+            ),
           Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        message.title ?? 'Promoção',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
                     ),
-                    onSubmitted: (_) => _sendMessage(),
+                    if (message.isOfficial)
+                      const Icon(Icons.verified, color: Colors.blue, size: 20),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message.description ?? message.text,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                if (message.price != null) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'R\$ ${message.price!.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      Text(
+                        'Postado em: ${_formatDate(message.timestamp)}',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ],
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
-                ),
+                ],
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+class _PromotionForm extends StatefulWidget {
+  final String locationId;
+  final Function(ChatMessage) onPost;
+
+  const _PromotionForm({required this.locationId, required this.onPost});
+
+  @override
+  State<_PromotionForm> createState() => _PromotionFormState();
+}
+
+class _PromotionFormState extends State<_PromotionForm> {
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  final _priceController = TextEditingController();
+  String? _bannerUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nova Promoção'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Título'),
+            ),
+            TextField(
+              controller: _descController,
+              decoration: const InputDecoration(labelText: 'Descrição'),
+              maxLines: 3,
+            ),
+            TextField(
+              controller: _priceController,
+              decoration: const InputDecoration(
+                labelText: 'Preço (Opcional)',
+                prefixText: 'R\$ ',
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text('Banner: '),
+                ProductImagePicker(
+                  onImageUploaded: (url) => setState(() => _bannerUrl = url),
+                ),
+                if (_bannerUrl != null)
+                  const Icon(Icons.check_circle, color: Colors.green),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_titleController.text.isEmpty) return;
+
+            final msg = ChatMessage(
+              id: const Uuid().v4(),
+              sender: 'Operador',
+              text: _descController.text,
+              timestamp: DateTime.now(),
+              messageId: const Uuid().v4(),
+              locationId: widget.locationId,
+              isOfficial: true,
+              isPromotion: true,
+              title: _titleController.text,
+              description: _descController.text,
+              bannerUrl: _bannerUrl,
+              price: double.tryParse(_priceController.text),
+            );
+
+            widget.onPost(msg);
+            Navigator.pop(context);
+          },
+          child: const Text('Postar'),
+        ),
+      ],
     );
   }
 }

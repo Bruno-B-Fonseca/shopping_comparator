@@ -5,7 +5,9 @@ import '../services/sync_service.dart';
 import 'scan_screen.dart';
 import 'cart_screen.dart';
 import 'compare_screen.dart';
-import 'chat_screen.dart';
+import 'product_search_screen.dart';
+import 'establishments_screen.dart';
+import 'operator_settings_screen.dart'; // Importação adicionada
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -14,17 +16,33 @@ class HomeScreen extends ConsumerWidget {
     ScanScreen(),
     CartScreen(),
     CompareScreen(),
-    ChatScreen(),
+    ProductSearchScreen(),
+    EstablishmentsScreen(),
   ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedIndex = ref.watch(navigationProvider);
-    
+
     // Mantém o serviço de sincronização global ativo
     ref.watch(syncServiceProvider);
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Shopping Comparator'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const OperatorSettingsScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: IndexedStack(index: selectedIndex, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
@@ -38,7 +56,8 @@ class HomeScreen extends ConsumerWidget {
           ),
           NavigationDestination(icon: Icon(Icons.shopping_cart), label: 'Cart'),
           NavigationDestination(icon: Icon(Icons.map), label: 'Compare'),
-          NavigationDestination(icon: Icon(Icons.chat), label: 'Chat'),
+          NavigationDestination(icon: Icon(Icons.search), label: 'Pesquisa'),
+          NavigationDestination(icon: Icon(Icons.store), label: 'Locais'),
         ],
       ),
     );

@@ -8,8 +8,13 @@ import '../services/image_service.dart';
 
 class ProductImagePicker extends StatefulWidget {
   final Function(double)? onPriceDetected;
+  final Function(String)? onImageUploaded;
 
-  const ProductImagePicker({super.key, this.onPriceDetected});
+  const ProductImagePicker({
+    super.key,
+    this.onPriceDetected,
+    this.onImageUploaded,
+  });
 
   @override
   State<ProductImagePicker> createState() => _ProductImagePickerState();
@@ -57,12 +62,19 @@ class _ProductImagePickerState extends State<ProductImagePicker> {
     try {
       final baseUrl = ImageService.baseUrl;
 
-      // Dispara o processamento de preço no backend (OCR -> IA Fallback)
+      // 1. Sempre faz o upload para o MinIO para persistência/URL
+      final uploadedUrl = await ImageService.uploadImage(bytes);
+      if (uploadedUrl != null && widget.onImageUploaded != null) {
+        widget.onImageUploaded!(uploadedUrl);
+      }
+
+      // 2. Se houver callback de preço, dispara o processamento de OCR no backend
       if (widget.onPriceDetected != null) {
         final request = http.MultipartRequest(
           'POST',
           Uri.parse('$baseUrl/products/process-price'),
         );
+        // ... rest of implementation
 
         request.files.add(
           http.MultipartFile.fromBytes(

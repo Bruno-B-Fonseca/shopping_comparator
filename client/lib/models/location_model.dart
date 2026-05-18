@@ -19,17 +19,47 @@ class LocationModel extends HiveObject {
   final double longitude;
 
   @HiveField(4)
-  final String? photoBase64;
+  final String? logoUrl;
+
+  @HiveField(5)
+  final double? minLat;
+
+  @HiveField(6)
+  final double? maxLat;
+
+  @HiveField(7)
+  final double? minLong;
+
+  @HiveField(8)
+  final double? maxLong;
 
   LocationModel({
     required this.id,
     required this.name,
     required this.latitude,
     required this.longitude,
-    this.photoBase64,
+    this.logoUrl,
+    this.minLat,
+    this.maxLat,
+    this.minLong,
+    this.maxLong,
   });
 
   factory LocationModel.fromJson(Map<String, dynamic> json) =>
       _$LocationModelFromJson(json);
   Map<String, dynamic> toJson() => _$LocationModelToJson(this);
+
+  /// Checks if a given coordinate is within the establishment perimeter.
+  bool contains(double lat, double long) {
+    if (minLat == null ||
+        maxLat == null ||
+        minLong == null ||
+        maxLong == null) {
+      return false;
+    }
+    return lat >= minLat! &&
+        lat <= maxLat! &&
+        long >= minLong! &&
+        long <= maxLong!;
+  }
 }

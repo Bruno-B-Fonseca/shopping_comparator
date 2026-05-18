@@ -5,6 +5,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:http/http.dart' as http;
 
 abstract class AIEngine {
+  Future<void> warmup();
   Future<Map<String, dynamic>?> extractProductMetadata(String searchText);
   Future<double?> extractPriceFromImage(Uint8List imageBytes);
 }
@@ -14,6 +15,27 @@ class OllamaEngine implements AIEngine {
   final String model;
 
   OllamaEngine({required this.baseUrl, this.model = 'qwen2.5:latest'});
+
+  @override
+  Future<void> warmup() async {
+    print('AI: Enviando "Bom dia" para o Ollama para aquecimento...');
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/generate'),
+        body: jsonEncode({
+          'model': model,
+          'prompt': 'Bom dia! Apenas responda "Bom dia" para confirmar que você está pronto.',
+          'stream': false,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        print('AI: Ollama aquecido com sucesso.');
+      }
+    } catch (e) {
+      print('AI: Falha no aquecimento do Ollama: $e');
+    }
+  }
 
   @override
   Future<double?> extractPriceFromImage(Uint8List imageBytes) async {
@@ -59,7 +81,7 @@ If no price is found, return {"price": null}.
 Extract product information from the following search results for a barcode.
 Return ONLY a JSON object with these fields:
 - name: Full descriptive name of the product.
-- unit: Standard unit (e.g., "un", "kg", "litro", "g").
+- unit: Quantity and unit combined (e.g., "100g", "1L", "2Kg", "500ml", "1un"). Look for these details in the title.
 - manufacturer: Brand or manufacturer name.
 
 Search Results:
@@ -67,7 +89,6 @@ $searchText
 
 JSON Output:
 ''';
-    // ... rest of implementation
 
     try {
       final response = await http.post(
@@ -96,6 +117,18 @@ class GeminiEngine implements AIEngine {
   final String modelName;
 
   GeminiEngine({required this.apiKey, this.modelName = 'gemini-1.5-flash'});
+
+  @override
+  Future<void> warmup() async {
+    print('AI: Aquecendo Gemini Engine...');
+    try {
+      final model = GenerativeModel(model: modelName, apiKey: apiKey);
+      await model.generateContent([Content.text('Ping')]);
+      print('AI: Gemini pronto.');
+    } catch (e) {
+      print('AI: Erro no warmup do Gemini: $e');
+    }
+  }
 
   @override
   Future<double?> extractPriceFromImage(Uint8List imageBytes) async {
@@ -137,7 +170,7 @@ If no price is found, return {"price": null}.
 Extract product information from the following search results for a barcode.
 Return ONLY a JSON object with these fields:
 - name: Full descriptive name of the product.
-- unit: Standard unit (e.g., "un", "kg", "litro", "g").
+- unit: Quantity and unit combined (e.g., "100g", "1L", "2Kg", "500ml", "1un"). Look for these details in the title.
 - manufacturer: Brand or manufacturer name.
 
 Search Results:

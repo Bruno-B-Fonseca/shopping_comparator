@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:logging/logging.dart';
 import 'package:minio/minio.dart';
 import 'package:server/cluster_service.dart';
@@ -51,11 +52,13 @@ void main() async {
     );
   } else {
     // Default to internal docker service name
-    final ollamaUrl = Platform.environment['OLLAMA_URL'] ?? 'http://ollama:11434';
-    aiEngine = OllamaEngine(
-      baseUrl: ollamaUrl,
-    );
+    final ollamaUrl =
+        Platform.environment['OLLAMA_URL'] ?? 'http://ollama:11434';
+    aiEngine = OllamaEngine(baseUrl: ollamaUrl);
   }
+
+  // Warmup AI Engine
+  unawaited(aiEngine.warmup());
 
   _metadataService = ProductMetadataService(
     aiEngine: aiEngine,
@@ -69,6 +72,8 @@ void main() async {
       region: Platform.environment['REGION'] ?? 'default',
       publicWsUrl:
           Platform.environment['PUBLIC_WS_URL'] ?? 'ws://localhost:$port',
+      locationId: Platform.environment['LOCATION_ID'] ?? '',
+      locationPassword: Platform.environment['LOCATION_PASSWORD'] ?? '',
       onRelayMessage: (payload, origin) {
         // Broadcast relayed message to local clients
         _broadcast(
@@ -130,10 +135,12 @@ void main() async {
       _clients.add(webSocket);
 
       // Envia boas-vindas para confirmar conexão ao cliente
-      webSocket.sink.add(jsonEncode({
-        fieldType: 'connection_established',
-        fieldTimestamp: DateTime.now().toIso8601String(),
-      }));
+      webSocket.sink.add(
+        jsonEncode({
+          fieldType: 'connection_established',
+          fieldTimestamp: DateTime.now().toIso8601String(),
+        }),
+      );
 
       webSocket.stream.listen(
         (message) async {
@@ -152,15 +159,62 @@ void main() async {
               }
             }
 
-            // Ensure messageId and timestamp exist for deduplication
-            msg[fieldMessageId] ??= const Uuid().v4();
-            msg[fieldTimestamp] ??= DateTime.now().toIso8601String();
+            // ... (variáveis globais)
+            final String locationPassword =
+                Platform.environment['LOCATION_PASSWORD'] ?? '';
+
+            // ... (dentro do listen do webSocket)
+            // Lógica de autenticação para postagens no chat/promoções
+            if (type == 'chat_message' || type == 'promotion') {
+              final signature = msg[fieldSignature] as String?;
+              final timestamp = msg[fieldTimestamp] as String?;
+              final messageId = msg[fieldMessageId] as String?;
+
+              if (signature == null || timestamp == null || messageId == null) {
+                print('SERVER: Bloqueando mensagem não assinada de $type');
+                webSocket.sink.add(
+                  jsonEncode({
+                    fieldType: msgError,
+                    fieldMessage: 'Autenticação necessária',
+                  }),
+                );
+                return; // Descarta a mensagem
+              }
+
+              // Validar assinatura HMAC
+              final payloadString = jsonEncode(msg[fieldPayload]);
+              final key = utf8.encode(locationPassword);
+              final messageToSign = '$payloadString$timestamp$messageId';
+              final hmac = Hmac(sha256, key);
+              final expectedSignature = hmac
+                  .convert(utf8.encode(messageToSign))
+                  .toString();
+
+              if (signature != expectedSignature) {
+                print('SERVER: Assinatura inválida para $type');
+                webSocket.sink.add(
+                  jsonEncode({
+                    fieldType: msgError,
+                    fieldMessage: 'Assinatura inválida',
+                  }),
+                );
+                return;
+              }
+
+              // Se passou, marca como oficial
+              msg['isOfficial'] = true;
+            } else {
+              // Mensagens de usuário comum (ex: chat geral não oficial) não precisam de assinatura
+              // ou podem ter isOfficial = false
+              msg['isOfficial'] = false;
+            }
 
             final encodedMsg = jsonEncode(msg);
 
             // Broadcast locally
             print(
-                'SERVER: Propagando [$type] para ${_clients.length - 1} outros clientes');
+              'SERVER: Propagando [$type] para ${_clients.length - 1} outros clientes',
+            );
             _broadcast(encodedMsg, exclude: webSocket);
 
             // If not a relay message from hub, publish to cluster
@@ -183,7 +237,7 @@ void main() async {
       );
     })(request),
   );
-// ... rest of the code
+  // ... rest of the code
 
   // Process Price handler
   router.post('/products/process-price', (Request request) async {
@@ -218,15 +272,21 @@ void main() async {
 
       final price = await priceProcessor.processImage(fileBytes);
       if (price != null) {
-        return Response.ok(jsonEncode({'price': price}),
-            headers: {'Content-Type': 'application/json'});
+        return Response.ok(
+          jsonEncode({'price': price}),
+          headers: {'Content-Type': 'application/json'},
+        );
       } else {
-        return Response.ok(jsonEncode({'price': null, 'error': 'Could not detect price'}),
-            headers: {'Content-Type': 'application/json'});
+        return Response.ok(
+          jsonEncode({'price': null, 'error': 'Could not detect price'}),
+          headers: {'Content-Type': 'application/json'},
+        );
       }
     } catch (e) {
       print('SERVER ERROR in process-price: $e');
-      return Response.internalServerError(body: 'Multipart processing failed: $e');
+      return Response.internalServerError(
+        body: 'Multipart processing failed: $e',
+      );
     }
   });
 
@@ -336,10 +396,10 @@ void _triggerAISearchIfMissing(String barcode, Request request) async {
   // Wait a bit to see if another server in the cluster responds
   await Future.delayed(const Duration(seconds: 3));
 
-  // In a real scenario, we'd check a local cache/DB here. 
-  // For this MVP, the "source of truth" is the broadcast, 
+  // In a real scenario, we'd check a local cache/DB here.
+  // For this MVP, the "source of truth" is the broadcast,
   // so we'll just proceed with AI search if we want to be proactive.
-  
+
   final metadata = await _metadataService.fetchAndRegisterProduct(barcode);
   if (metadata != null) {
     final registrationMsg = {
@@ -352,7 +412,7 @@ void _triggerAISearchIfMissing(String barcode, Request request) async {
     print('AI: Cadastro automático concluído para $barcode. Transmitindo...');
     final encoded = jsonEncode(registrationMsg);
     _broadcast(encoded);
-    
+
     if (Platform.environment['HUB_URL'] != null) {
       _cluster.publish('region/${_cluster.region}', registrationMsg);
     }

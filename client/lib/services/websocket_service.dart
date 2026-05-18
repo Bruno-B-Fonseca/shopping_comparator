@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 enum WebSocketStatus { connected, disconnected, connecting }
@@ -22,6 +25,37 @@ class WebSocketService {
   Timer? _reconnectTimer;
   String? _lastUrl;
 
+  Future<void> sendAuthenticatedMessage(Map<String, dynamic> message) async {
+    final type = message['type'] as String?;
+    
+    // Se for mensagem oficial, assina usando credenciais salvas
+    if (type == 'chat_message' || type == 'promotion') {
+      final prefs = await SharedPreferences.getInstance();
+      final password = prefs.getString('location_password');
+      
+      if (password != null && password.isNotEmpty) {
+        final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+        final messageId = const Uuid().v4();
+        
+        final payloadString = jsonEncode(message['payload']);
+        final key = utf8.encode(password);
+        final messageToSign = '$payloadString$timestamp$messageId';
+        
+        final hmac = Hmac(sha256, key);
+        final signature = hmac.convert(utf8.encode(messageToSign)).toString();
+        
+        message['signature'] = signature;
+        message['timestamp'] = timestamp;
+        message['messageId'] = messageId;
+      } else {
+        debugPrint('Erro: Tentativa de postagem oficial sem credenciais.');
+        return; // Ou lançar exceção
+      }
+    }
+    
+    sendMessage(message);
+  }
+
   void connect(String url) {
     _lastUrl = url;
     if (_currentStatus == WebSocketStatus.connecting) return;
@@ -31,15 +65,20 @@ class WebSocketService {
 
     try {
       _channel = WebSocketChannel.connect(Uri.parse(url));
-      
+
       // Usa .ready para saber quando a conexão foi de fato estabelecida
-      _channel!.ready.then((_) {
-        debugPrint('WebSocket: Conexão estabelecida com sucesso!');
-        _reconnectAttempts = 0;
-        _updateStatus(WebSocketStatus.connected);
-      }).catchError((e) {
-        debugPrint('WebSocket: Erro ao validar prontidão: $e');
-      });
+      _channel!.ready
+          .then((_) {
+            debugPrint('WebSocket: Conexão estabelecida com sucesso!');
+            _reconnectAttempts = 0;
+            _updateStatus(WebSocketStatus.connected);
+
+            // Solicita sincronização inicial de dados
+            sendMessage({'type': 'sync_request'});
+          })
+          .catchError((e) {
+            debugPrint('WebSocket: Erro ao validar prontidão: $e');
+          });
 
       _channel!.stream.listen(
         (data) {
@@ -47,7 +86,7 @@ class WebSocketService {
           if (_currentStatus != WebSocketStatus.connected) {
             _updateStatus(WebSocketStatus.connected);
           }
-          
+
           try {
             final Map<String, dynamic> message = jsonDecode(data);
             _messageController.add(message);
@@ -84,7 +123,9 @@ class WebSocketService {
     _reconnectAttempts++;
     // Exponential backoff: 1s, 2s, 4s, 8s, up to 30s
     final delaySeconds = (1 << (_reconnectAttempts - 1)).clamp(1, 30);
-    debugPrint('Reconnecting in $delaySeconds seconds (attempt $_reconnectAttempts)...');
+    debugPrint(
+      'Reconnecting in $delaySeconds seconds (attempt $_reconnectAttempts)...',
+    );
 
     _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
       if (_lastUrl != null) {
@@ -111,7 +152,9 @@ class WebSocketService {
         debugPrint('Error sending message: $e');
       }
     } else {
-      debugPrint('Cannot send message: Status=$_currentStatus, Channel=${_channel != null}');
+      debugPrint(
+        'Cannot send message: Status=$_currentStatus, Channel=${_channel != null}',
+      );
     }
   }
 

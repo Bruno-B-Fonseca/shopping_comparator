@@ -1,4 +1,4 @@
-/// Tipos de mensagem
+/// Tipos de mensagem existentes
 const String msgRegister = 'register';
 const String msgSubscribe = 'subscribe';
 const String msgPublish = 'publish';
@@ -9,8 +9,14 @@ const String msgPing = 'ping';
 const String msgPong = 'pong';
 const String msgError = 'error';
 const String msgProductRequest = 'product_request';
+const String msgSyncRequest = 'sync_request';
+const String msgSyncResponse = 'sync_response';
 
-/// Campos comuns
+/// Novos tipos de mensagem para autenticação HMAC
+const String msgAuthChallenge = 'auth_challenge';
+const String msgAuthResponse = 'auth_response';
+
+/// Campos comuns existentes
 const String fieldType = 'type';
 const String fieldServerId = 'serverId';
 const String fieldRegion = 'region';
@@ -23,3 +29,8 @@ const String fieldTimestamp = 'timestamp';
 const String fieldOriginServerId = 'originServerId';
 const String fieldPeers = 'peers';
 const String fieldMessage = 'message';
+
+/// Novos campos para autenticação
+const String fieldNonce = 'nonce';
+const String fieldSignature = 'signature';
+const String fieldLocationId = 'locationId';
