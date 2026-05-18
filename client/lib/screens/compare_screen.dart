@@ -1,3 +1,5 @@
+import 'package:client/providers/cart_provider.dart';
+import 'package:client/services/map_tile_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +20,8 @@ class CompareScreen extends ConsumerStatefulWidget {
 class _CompareScreenState extends ConsumerState<CompareScreen> {
   LatLng _currentCenter = const LatLng(-23.5505, -46.6333); // SP Default
   bool _loading = true;
+  final MapController _mapController = MapController();
+  String? _selectedBarcode;
 
   @override
   void initState() {
@@ -40,10 +44,12 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   Future<void> _initLocation() async {
     final pos = await LocationService.getCurrentPosition();
     if (pos != null) {
+      final newPos = LatLng(pos.latitude, pos.longitude);
       setState(() {
-        _currentCenter = LatLng(pos.latitude, pos.longitude);
+        _currentCenter = newPos;
         _loading = false;
       });
+      _mapController.move(newPos, 15.0);
     } else {
       setState(() {
         _loading = false;
@@ -53,10 +59,53 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final prices = StorageService.prices.values.toList();
+    final cartItems = ref.watch(cartProvider);
+    final cartBarcodes = cartItems.map((item) => item.barcode).toSet();
+
+    // Filtra preços: se um produto estiver selecionado, mostra apenas ele.
+    // Caso contrário, mostra todos os produtos que estão no carrinho.
+    final filteredPrices = StorageService.prices.values.where((p) {
+      if (_selectedBarcode != null) {
+        return p.barcode == _selectedBarcode;
+      }
+      return cartBarcodes.contains(p.barcode);
+    }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Price Comparison')),
+      appBar: AppBar(
+        title: const Text('Comparação de Preços'),
+        actions: [
+          if (cartItems.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: DropdownButton<String>(
+                value: _selectedBarcode,
+                hint: const Text('Filtrar Produto'),
+                icon: const Icon(Icons.filter_list),
+                underline: const SizedBox(),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('Todos do Carrinho'),
+                  ),
+                  ...cartItems.map((item) {
+                    final product = StorageService.products.get(item.barcode);
+                    return DropdownMenuItem<String>(
+                      value: item.barcode,
+                      child: Text(
+                        product?.name ?? item.barcode,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }),
+                ],
+                onChanged: (value) {
+                  setState(() => _selectedBarcode = value);
+                },
+              ),
+            ),
+        ],
+      ),
       body: _loading
           ? EmptyStateWidget(
               icon: Icons.location_searching,
@@ -65,6 +114,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                   'Aguarde enquanto localizamos os preços mais próximos de você',
             )
           : FlutterMap(
+              mapController: _mapController,
               options: MapOptions(
                 initialCenter: _currentCenter,
                 initialZoom: 15.0,
@@ -73,9 +123,10 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.example.shopping_comparator',
+                  tileProvider: HiveTileProvider(StorageService.mapTiles),
                 ),
                 MarkerLayer(
-                  markers: prices
+                  markers: filteredPrices
                       .map((price) {
                         final loc = StorageService.locations.get(
                           price.locationId,

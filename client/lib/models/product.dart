@@ -18,11 +18,19 @@ class Product extends HiveObject {
   @HiveField(3)
   final String manufacturer;
 
+  @HiveField(4)
+  final String? photoUrl;
+
+  @HiveField(5)
+  final String? nutritionalInfo;
+
   Product({
     required this.barcode,
     required this.name,
     required this.unit,
     required this.manufacturer,
+    this.photoUrl,
+    this.nutritionalInfo,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) =>

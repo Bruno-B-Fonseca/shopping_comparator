@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../providers/cart_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../services/storage_service.dart';
+import '../services/image_service.dart';
 import '../widgets/empty_state_widget.dart';
 
 class CartScreen extends ConsumerWidget {
@@ -86,7 +87,20 @@ class CartScreen extends ConsumerWidget {
                           );
                         },
                         child: ListTile(
-                          leading: const Icon(Icons.shopping_bag),
+                          leading: CircleAvatar(
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            backgroundImage: product?.photoUrl != null
+                                ? NetworkImage(
+                                    ImageService.sanitizeUrl(
+                                        product!.photoUrl!),
+                                  )
+                                : null,
+                            child: product?.photoUrl == null
+                                ? const Icon(Icons.shopping_bag)
+                                : null,
+                          ),
                           title: Text(product?.name ?? 'Unknown Product'),
                           subtitle: Text(
                             '${item.quantity} x ${currencyFormat.format(item.unitPrice)}',

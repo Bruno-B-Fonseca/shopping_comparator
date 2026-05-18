@@ -5,7 +5,9 @@ import '../models/product.dart';
 import '../models/price_update.dart';
 import '../models/location_model.dart';
 import '../services/storage_service.dart';
+import '../services/image_service.dart';
 import '../widgets/empty_state_widget.dart';
+import 'scan_screen.dart';
 
 class ProductSearchScreen extends ConsumerStatefulWidget {
   const ProductSearchScreen({super.key});
@@ -194,6 +196,20 @@ class _ProductResultTile extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Avatar com imagem do produto
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  backgroundImage: item.product.photoUrl != null
+                      ? NetworkImage(
+                          ImageService.sanitizeUrl(item.product.photoUrl!),
+                        )
+                      : null,
+                  child: item.product.photoUrl == null
+                      ? const Icon(Icons.shopping_bag)
+                      : null,
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,26 +225,59 @@ class _ProductResultTile extends StatelessWidget {
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
+                      if (item.product.nutritionalInfo != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            item.product.nutritionalInfo!,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: colorScheme.primary,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    item.product.barcode,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontFamily: 'monospace',
-                      color: colorScheme.onSurfaceVariant,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        item.product.barcode,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontFamily: 'monospace',
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    // AÇÃO: Ir para tela de Scan/Preço
+                    IconButton.filledTonal(
+                      icon: const Icon(Icons.add_shopping_cart, size: 20),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ScanScreen(
+                              initialBarcode: item.product.barcode,
+                            ),
+                          ),
+                        );
+                      },
+                      tooltip: 'Informar Preço / Adicionar',
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -99,8 +99,10 @@ class SyncService {
     debugPrint('SyncService: Recebida solicitação de sincronização global');
     final ws = ref.read(webSocketServiceProvider);
 
-    // 1. Enviar Locais
-    final locations = StorageService.locations.values.toList();
+    // 1. Enviar Locais (Apenas oficiais)
+    final locations = StorageService.locations.values
+        .where((loc) => !loc.id.startsWith('private_'))
+        .toList();
     if (locations.isNotEmpty) {
       debugPrint(
         'SyncService: Enviando ${locations.length} locais para os pares',
@@ -127,8 +129,10 @@ class SyncService {
       }
     }
 
-    // 3. Enviar Preços conhecidos
-    final prices = StorageService.prices.values.toList();
+    // 3. Enviar Preços conhecidos (Apenas de locais oficiais)
+    final prices = StorageService.prices.values
+        .where((p) => !p.locationId.startsWith('private_'))
+        .toList();
     if (prices.isNotEmpty) {
       debugPrint(
         'SyncService: Enviando ${prices.length} atualizações de preço para os pares',

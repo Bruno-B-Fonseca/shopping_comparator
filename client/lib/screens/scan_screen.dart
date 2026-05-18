@@ -12,13 +12,15 @@ import '../providers/websocket_provider.dart';
 import '../services/location_service.dart';
 import '../services/storage_service.dart';
 import '../services/websocket_service.dart';
+import '../services/image_service.dart';
 import '../widgets/barcode_scanner_widget.dart';
 import '../widgets/empty_state_widget.dart';
 import '../widgets/location_consent_dialog.dart';
 import '../widgets/product_image_picker.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
-  const ScanScreen({super.key});
+  final String? initialBarcode;
+  const ScanScreen({super.key, this.initialBarcode});
 
   @override
   ConsumerState<ScanScreen> createState() => _ScanScreenState();
@@ -31,6 +33,26 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
   Product? _currentProduct;
   bool _isSearchingCluster = false;
+
+  void _resetScan() {
+    _barcodeController.clear();
+    _priceController.clear();
+    _qtyController.text = '1';
+    setState(() {
+      _currentProduct = null;
+      _isSearchingCluster = false;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialBarcode != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _lookupProduct(widget.initialBarcode);
+      });
+    }
+  }
 
   void _updatePriceFromStorage(String barcode) {
     final prices =
@@ -165,7 +187,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   void _addToCart() async {
     if (_currentProduct == null) return;
     final price = double.tryParse(_priceController.text) ?? 0.0;
-    final qty = double.tryParse(_qtyController.text) ?? 1.0;
 
     if (price <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -333,7 +354,16 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan Product')),
+      appBar: AppBar(
+        title: const Text('Scan Product'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _resetScan,
+            tooltip: 'Reiniciar Scan',
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -366,7 +396,18 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             else if (_currentProduct != null) ...[
               Card(
                 child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.shopping_bag)),
+                  leading: CircleAvatar(
+                    backgroundColor:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    backgroundImage: _currentProduct!.photoUrl != null
+                        ? NetworkImage(
+                            ImageService.sanitizeUrl(_currentProduct!.photoUrl!),
+                          )
+                        : null,
+                    child: _currentProduct!.photoUrl == null
+                        ? const Icon(Icons.shopping_bag)
+                        : null,
+                  ),
                   title: Text(_currentProduct!.name),
                   subtitle: Text('by ${_currentProduct!.manufacturer}'),
                 ),

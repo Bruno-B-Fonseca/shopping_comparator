@@ -161,6 +161,15 @@ class _OperatorSettingsScreenState
             ),
             const SizedBox(height: 12),
             TextButton.icon(
+              onPressed: _showClearMapCacheDialog,
+              icon: const Icon(Icons.map_outlined),
+              label: const Text('Limpar cache de mapas'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.blueGrey,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
@@ -286,6 +295,39 @@ class _OperatorSettingsScreenState
               }
             },
             child: const Text('Resetar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClearMapCacheDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('🗺️ Limpar Cache de Mapas'),
+        content: const Text(
+          'Isso apagará todos os tiles de mapa baixados. Você precisará de internet para visualizar o mapa novamente.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await StorageService.mapTiles.clear();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Cache de mapas limpo com sucesso'),
+                  ),
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.orange),
+            child: const Text('Limpar Cache'),
           ),
         ],
       ),

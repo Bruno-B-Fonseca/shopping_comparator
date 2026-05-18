@@ -27,7 +27,12 @@ class StorageService {
     await _openBoxSafe<PriceUpdate>('prices', encryptionKey);
     await _openBoxSafe<CartItem>('cart', encryptionKey);
     await _openBoxSafe<ChatMessage>('messages', encryptionKey);
+
+    // Box de tiles (Cache do mapa) - Sem criptografia por performance e serem dados públicos
+    await Hive.openBox<Uint8List>('map_tiles');
   }
+
+  static Box<Uint8List> get mapTiles => Hive.box<Uint8List>('map_tiles');
 
   static Future<void> _openBoxSafe<T>(String name, List<int> encryptionKey) async {
     try {
