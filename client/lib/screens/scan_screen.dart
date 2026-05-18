@@ -7,12 +7,14 @@ import '../models/location_model.dart';
 import '../models/price_update.dart';
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
+import '../providers/consent_provider.dart';
 import '../providers/websocket_provider.dart';
 import '../services/location_service.dart';
 import '../services/storage_service.dart';
 import '../services/websocket_service.dart';
 import '../widgets/barcode_scanner_widget.dart';
 import '../widgets/empty_state_widget.dart';
+import '../widgets/location_consent_dialog.dart';
 import '../widgets/product_image_picker.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
@@ -173,6 +175,45 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     }
 
     // Registrar atualização de preço se houver localização
+    await _getPositionWithConsent();
+  }
+
+  Future<void> _getPositionWithConsent() async {
+    final consent = ref.read(consentProvider);
+
+    if (!consent.locationConsent) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => LocationConsentDialog(
+          onAllow: () async {
+            Navigator.pop(context);
+            await ref.read(consentProvider.notifier).setLocationConsent(true);
+            if (mounted) {
+              await _processWithLocation();
+            }
+          },
+          onDeny: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Localização não autorizada. Dados não serão compartilhados com a rede.',
+                ),
+              ),
+            );
+            _processWithoutLocation();
+          },
+        ),
+      );
+    } else {
+      await _processWithLocation();
+    }
+  }
+
+  Future<void> _processWithLocation() async {
+    final price = double.tryParse(_priceController.text) ?? 0.0;
+    final qty = double.tryParse(_qtyController.text) ?? 1.0;
     final position = await LocationService.getCurrentPosition();
     if (position != null) {
       final double lat = position.latitude;
@@ -199,7 +240,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         );
       } else {
         // 2. Fallback: Localização privada (não compartilhada)
-        locationId = 'private_${lat.toStringAsFixed(4)}_${lng.toStringAsFixed(4)}';
+        locationId =
+            'private_${lat.toStringAsFixed(4)}_${lng.toStringAsFixed(4)}';
 
         if (!StorageService.locations.containsKey(locationId)) {
           final loc = LocationModel(
@@ -257,6 +299,34 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Added to cart')));
+    }
+  }
+
+  void _processWithoutLocation() {
+    if (_currentProduct == null) return;
+    final price = double.tryParse(_priceController.text) ?? 0.0;
+    final qty = double.tryParse(_qtyController.text) ?? 1.0;
+
+    final cartItem = CartItem(
+      barcode: _currentProduct!.barcode,
+      quantity: qty,
+      unitPrice: price,
+      addedAt: DateTime.now(),
+    );
+
+    ref.read(cartProvider.notifier).addItem(cartItem);
+
+    _barcodeController.clear();
+    _priceController.clear();
+    _qtyController.text = '1';
+    setState(() {
+      _currentProduct = null;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Added to cart (without sharing)')),
+      );
     }
   }
 

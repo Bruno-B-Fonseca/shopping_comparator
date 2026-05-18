@@ -1,8 +1,15 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import './consent_service.dart';
 
 class LocationService {
   static Future<Position?> getCurrentPosition() async {
+    // Verificar consentimento LGPD
+    final hasConsent = await ConsentService.hasLocationConsent();
+    if (!hasConsent) {
+      return null;
+    }
+
     bool serviceEnabled;
     LocationPermission permission;
 

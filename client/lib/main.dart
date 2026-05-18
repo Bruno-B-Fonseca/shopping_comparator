@@ -1,10 +1,12 @@
 import 'package:client/providers/websocket_provider.dart';
+import 'package:client/providers/consent_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'screens/home_screen.dart';
 import 'services/storage_service.dart';
+import 'widgets/privacy_consent_dialog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +31,20 @@ class _ShoppingComparatorAppState extends ConsumerState<ShoppingComparatorApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPrivacyConsent();
+    });
+  }
+
+  void _checkPrivacyConsent() {
+    final consent = ref.read(consentProvider);
+    if (!consent.privacyAcknowledged) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const PrivacyConsentDialog(),
+      );
+    }
   }
 
   @override

@@ -1,12 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_editor_plus/image_editor_plus.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/image_service.dart';
+import '../providers/consent_provider.dart';
+import 'ai_image_processing_dialog.dart';
 
-class ProductImagePicker extends StatefulWidget {
+class ProductImagePicker extends ConsumerStatefulWidget {
   final Function(double)? onPriceDetected;
   final Function(String)? onImageUploaded;
 
@@ -17,10 +20,10 @@ class ProductImagePicker extends StatefulWidget {
   });
 
   @override
-  State<ProductImagePicker> createState() => _ProductImagePickerState();
+  ConsumerState<ProductImagePicker> createState() => _ProductImagePickerState();
 }
 
-class _ProductImagePickerState extends State<ProductImagePicker> {
+class _ProductImagePickerState extends ConsumerState<ProductImagePicker> {
   final ImagePicker _picker = ImagePicker();
   bool _isProcessing = false;
 
@@ -44,7 +47,8 @@ class _ProductImagePickerState extends State<ProductImagePicker> {
 
       if (editedImage != null) {
         if (!mounted) return;
-        _processPriceFromImage(editedImage);
+        // Verifica consentimento LGPD antes de processar
+        _showAiConsentIfNeeded(editedImage);
       }
     } catch (e) {
       debugPrint('Error picking/editing image: $e');
@@ -53,6 +57,28 @@ class _ProductImagePickerState extends State<ProductImagePicker> {
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
+    }
+  }
+
+  void _showAiConsentIfNeeded(Uint8List imageBytes) {
+    final consent = ref.read(consentProvider);
+
+    if (!consent.aiProcessingConsent) {
+      showDialog(
+        context: context,
+        builder: (_) => AiImageProcessingDialog(
+          onConfirm: () async {
+            Navigator.pop(context);
+            await ref.read(consentProvider.notifier).setAiProcessingConsent(true);
+            if (mounted) {
+              _processPriceFromImage(imageBytes);
+            }
+          },
+          onCancel: () => Navigator.pop(context),
+        ),
+      );
+    } else {
+      _processPriceFromImage(imageBytes);
     }
   }
 
