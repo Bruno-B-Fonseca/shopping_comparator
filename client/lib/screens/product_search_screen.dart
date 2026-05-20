@@ -4,9 +4,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/product.dart';
 import '../models/price_update.dart';
 import '../models/location_model.dart';
+import '../providers/auth_provider.dart';
 import '../services/storage_service.dart';
 import '../services/image_service.dart';
 import '../widgets/empty_state_widget.dart';
+import '../widgets/product_image_picker.dart';
 import 'scan_screen.dart';
 
 class ProductSearchScreen extends ConsumerStatefulWidget {
@@ -172,14 +174,15 @@ class _SearchResult {
   _SearchResult({required this.product, this.lowestPrice, this.location});
 }
 
-class _ProductResultTile extends StatelessWidget {
+class _ProductResultTile extends ConsumerWidget {
   final _SearchResult item;
 
   const _ProductResultTile({required this.item});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isOperator = ref.watch(authProvider).isOperator;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -225,7 +228,8 @@ class _ProductResultTile extends StatelessWidget {
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      if (item.product.nutritionalInfo != null)
+                      if (item.product.nutritionalInfo != null &&
+                          item.product.nutritionalInfo!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4.0),
                           child: Text(
@@ -262,20 +266,31 @@ class _ProductResultTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // AÇÃO: Ir para tela de Scan/Preço
-                    IconButton.filledTonal(
-                      icon: const Icon(Icons.add_shopping_cart, size: 20),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ScanScreen(
-                              initialBarcode: item.product.barcode,
-                            ),
+                    Row(
+                      children: [
+                        if (isOperator)
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 20),
+                            onPressed: () => _showEditProductDialog(context),
+                            tooltip: 'Editar Produto',
+                            color: colorScheme.primary,
                           ),
-                        );
-                      },
-                      tooltip: 'Informar Preço / Adicionar',
+                        // AÇÃO: Ir para tela de Scan/Preço
+                        IconButton.filledTonal(
+                          icon: const Icon(Icons.add_shopping_cart, size: 20),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ScanScreen(
+                                  initialBarcode: item.product.barcode,
+                                ),
+                              ),
+                            );
+                          },
+                          tooltip: 'Informar Preço / Adicionar',
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -349,6 +364,119 @@ class _ProductResultTile extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditProductDialog(BuildContext context) {
+    final nameController = TextEditingController(text: item.product.name);
+    final manufacturerController = TextEditingController(
+      text: item.product.manufacturer,
+    );
+    final unitController = TextEditingController(text: item.product.unit);
+    final nutritionController = TextEditingController(
+      text: item.product.nutritionalInfo ?? '',
+    );
+    String? currentPhotoUrl = item.product.photoUrl;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Editar Produto'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Picker de Imagem para o Produto
+                Center(
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        backgroundImage: currentPhotoUrl != null
+                            ? NetworkImage(
+                                ImageService.sanitizeUrl(currentPhotoUrl!),
+                              )
+                            : null,
+                        child: currentPhotoUrl == null
+                            ? const Icon(Icons.shopping_bag, size: 40)
+                            : null,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: ProductImagePicker(
+                          onImageUploaded: (url) {
+                            setState(() {
+                              currentPhotoUrl = url;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Nome'),
+                ),
+                TextField(
+                  controller: manufacturerController,
+                  decoration: const InputDecoration(labelText: 'Fabricante'),
+                ),
+                TextField(
+                  controller: unitController,
+                  decoration: const InputDecoration(
+                    labelText: 'Unidade (ex: 1kg, 500ml)',
+                  ),
+                ),
+                TextField(
+                  controller: nutritionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Info Nutricional',
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final updatedProduct = Product(
+                  barcode: item.product.barcode,
+                  name: nameController.text.trim(),
+                  manufacturer: manufacturerController.text.trim(),
+                  unit: unitController.text.trim(),
+                  nutritionalInfo: nutritionController.text.trim(),
+                  photoUrl: currentPhotoUrl,
+                );
+
+                StorageService.products.put(
+                  item.product.barcode,
+                  updatedProduct,
+                );
+
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Produto atualizado com sucesso!'),
+                  ),
+                );
+              },
+              child: const Text('Salvar'),
+            ),
           ],
         ),
       ),

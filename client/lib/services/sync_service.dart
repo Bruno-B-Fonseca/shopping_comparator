@@ -1,12 +1,16 @@
 import 'dart:async';
+
+import 'package:client/providers/consent_provider.dart';
+import 'package:client/services/websocket_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../models/chat_message.dart';
-import '../models/product.dart';
 import '../models/location_model.dart';
 import '../models/price_update.dart';
-import '../services/storage_service.dart';
+import '../models/product.dart';
 import '../providers/websocket_provider.dart';
+import '../services/storage_service.dart';
 
 class SyncService {
   final Ref ref;
@@ -25,42 +29,53 @@ class SyncService {
     // Escuta o stream de mensagens diretamente
     _subscription = ref.read(webSocketServiceProvider).messages.listen((data) {
       try {
+        final consent = ref.read(consentProvider);
+        if (!consent.privacyAcknowledged) {
+          debugPrint(
+            'SyncService: Ignorando mensagem (privacidade não aceita)',
+          );
+          return;
+        }
+
         final String? type = data['type'];
         debugPrint('SyncService: Mensagem recebida [$type]');
 
         switch (type) {
           case 'product_registration':
-            _handleProductSync(data['payload']);
+            if (data['payload'] != null) _handleProductSync(data['payload']);
             break;
           case 'location_registration':
-            _handleLocationSync(data['payload']);
+            if (data['payload'] != null) _handleLocationSync(data['payload']);
             break;
           case 'sync_request':
             _handleSyncRequest();
             break;
           case 'product_request':
-            _handleProductRequest(data['payload']);
+            if (data['payload'] != null) _handleProductRequest(data['payload']);
             break;
           case 'price_update':
-            _handlePriceSync(data['payload']);
+            if (data['payload'] != null) _handlePriceSync(data['payload']);
             break;
           case 'chat_message':
-            _handleChatSync(data['payload']);
+            if (data['payload'] != null) _handleChatSync(data['payload']);
             break;
           case 'relay':
             final innerPayload = data['payload'];
             if (innerPayload is Map<String, dynamic>) {
               final innerType = innerPayload['type'];
+              final innerData = innerPayload['payload'];
+              if (innerData == null) break;
+
               if (innerType == 'product_registration') {
-                _handleProductSync(innerPayload['payload']);
+                _handleProductSync(innerData);
               } else if (innerType == 'location_registration') {
-                _handleLocationSync(innerPayload['payload']);
+                _handleLocationSync(innerData);
               } else if (innerType == 'chat_message') {
-                _handleChatSync(innerPayload['payload']);
+                _handleChatSync(innerData);
               } else if (innerType == 'product_request') {
-                _handleProductRequest(innerPayload['payload']);
+                _handleProductRequest(innerData);
               } else if (innerType == 'price_update') {
-                _handlePriceSync(innerPayload['payload']);
+                _handlePriceSync(innerData);
               }
             }
             break;
@@ -98,6 +113,13 @@ class SyncService {
   void _handleSyncRequest() {
     debugPrint('SyncService: Recebida solicitação de sincronização global');
     final ws = ref.read(webSocketServiceProvider);
+
+    if (ws.currentStatus != WebSocketStatus.connected) {
+      debugPrint(
+        'SyncService: Ignorando sync_request (WebSocket não conectado)',
+      );
+      return;
+    }
 
     // 1. Enviar Locais (Apenas oficiais)
     final locations = StorageService.locations.values
@@ -138,10 +160,7 @@ class SyncService {
         'SyncService: Enviando ${prices.length} atualizações de preço para os pares',
       );
       for (final price in prices) {
-        ws.sendMessage({
-          'type': 'price_update',
-          'payload': price.toJson(),
-        });
+        ws.sendMessage({'type': 'price_update', 'payload': price.toJson()});
       }
     }
 
@@ -152,10 +171,7 @@ class SyncService {
         'SyncService: Enviando ${messages.length} mensagens/promoções para os pares',
       );
       for (final msg in messages) {
-        ws.sendMessage({
-          'type': 'chat_message',
-          'payload': msg.toJson(),
-        });
+        ws.sendMessage({'type': 'chat_message', 'payload': msg.toJson()});
       }
     }
   }
@@ -188,27 +204,30 @@ class SyncService {
       debugPrint(
         'SyncService: Enviando dados do produto encontrado -> ${product.name}',
       );
-      ref.read(webSocketServiceProvider).sendMessage({
-        'type': 'product_registration',
-        'payload': product.toJson(),
-      });
-
-      // Busca também o último preço conhecido para esse produto
-      final prices =
-          StorageService.prices.values
-              .where((p) => p.barcode == barcode)
-              .toList()
-            ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-      if (prices.isNotEmpty) {
-        final lastPrice = prices.first;
-        debugPrint(
-          'SyncService: Enviando último preço conhecido -> R\$ ${lastPrice.price}',
-        );
-        ref.read(webSocketServiceProvider).sendMessage({
-          'type': 'price_update',
-          'payload': lastPrice.toJson(),
+      final ws = ref.read(webSocketServiceProvider);
+      if (ws.currentStatus == WebSocketStatus.connected) {
+        ws.sendMessage({
+          'type': 'product_registration',
+          'payload': product.toJson(),
         });
+
+        // Busca também o último preço conhecido para esse produto
+        final prices =
+            StorageService.prices.values
+                .where((p) => p.barcode == barcode)
+                .toList()
+              ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+        if (prices.isNotEmpty) {
+          final lastPrice = prices.first;
+          debugPrint(
+            'SyncService: Enviando último preço conhecido -> R\$ ${lastPrice.price}',
+          );
+          ws.sendMessage({
+            'type': 'price_update',
+            'payload': lastPrice.toJson(),
+          });
+        }
       }
     }
   }

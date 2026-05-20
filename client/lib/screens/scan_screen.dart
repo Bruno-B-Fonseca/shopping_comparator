@@ -6,6 +6,7 @@ import '../models/cart_item.dart';
 import '../models/location_model.dart';
 import '../models/price_update.dart';
 import '../models/product.dart';
+import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/consent_provider.dart';
 import '../providers/websocket_provider.dart';
@@ -197,6 +198,119 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
     // Registrar atualização de preço se houver localização
     await _getPositionWithConsent();
+  }
+
+  void _showEditProductDialog(Product product) {
+    final nameController = TextEditingController(text: product.name);
+    final manufacturerController = TextEditingController(
+      text: product.manufacturer,
+    );
+    final unitController = TextEditingController(text: product.unit);
+    final nutritionController = TextEditingController(
+      text: product.nutritionalInfo ?? '',
+    );
+    String? currentPhotoUrl = product.photoUrl;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Editar Produto'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        backgroundImage: currentPhotoUrl != null
+                            ? NetworkImage(
+                                ImageService.sanitizeUrl(currentPhotoUrl!),
+                              )
+                            : null,
+                        child: currentPhotoUrl == null
+                            ? const Icon(Icons.shopping_bag, size: 40)
+                            : null,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: ProductImagePicker(
+                          onImageUploaded: (url) {
+                            setState(() {
+                              currentPhotoUrl = url;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Nome'),
+                ),
+                TextField(
+                  controller: manufacturerController,
+                  decoration: const InputDecoration(labelText: 'Fabricante'),
+                ),
+                TextField(
+                  controller: unitController,
+                  decoration: const InputDecoration(
+                    labelText: 'Unidade (ex: 1kg, 500ml)',
+                  ),
+                ),
+                TextField(
+                  controller: nutritionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Info Nutricional',
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final updatedProduct = Product(
+                  barcode: product.barcode,
+                  name: nameController.text.trim(),
+                  manufacturer: manufacturerController.text.trim(),
+                  unit: unitController.text.trim(),
+                  nutritionalInfo: nutritionController.text.trim(),
+                  photoUrl: currentPhotoUrl,
+                );
+
+                StorageService.products.put(product.barcode, updatedProduct);
+
+                Navigator.pop(context);
+                this.setState(() {
+                  _currentProduct = updatedProduct;
+                });
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Produto atualizado com sucesso!'),
+                  ),
+                );
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _getPositionWithConsent() async {
@@ -397,11 +511,14 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               Card(
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor:
-                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     backgroundImage: _currentProduct!.photoUrl != null
                         ? NetworkImage(
-                            ImageService.sanitizeUrl(_currentProduct!.photoUrl!),
+                            ImageService.sanitizeUrl(
+                              _currentProduct!.photoUrl!,
+                            ),
                           )
                         : null,
                     child: _currentProduct!.photoUrl == null
@@ -410,6 +527,14 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                   ),
                   title: Text(_currentProduct!.name),
                   subtitle: Text('by ${_currentProduct!.manufacturer}'),
+                  trailing: ref.watch(authProvider).isOperator
+                      ? IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () =>
+                              _showEditProductDialog(_currentProduct!),
+                          tooltip: 'Editar Produto',
+                        )
+                      : null,
                 ),
               ),
               const SizedBox(height: 20),

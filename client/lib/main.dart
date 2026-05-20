@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'screens/home_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'services/storage_service.dart';
-import 'widgets/privacy_consent_dialog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,20 +31,6 @@ class _ShoppingComparatorAppState extends ConsumerState<ShoppingComparatorApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkPrivacyConsent();
-    });
-  }
-
-  void _checkPrivacyConsent() {
-    final consent = ref.read(consentProvider);
-    if (!consent.privacyAcknowledged) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const PrivacyConsentDialog(),
-      );
-    }
   }
 
   @override
@@ -57,13 +43,18 @@ class _ShoppingComparatorAppState extends ConsumerState<ShoppingComparatorApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // Quando o app volta (ex: após fechar a câmera), garantimos a conexão
-      debugPrint('App resumed: Verificando conectividade WebSocket...');
-      ref.read(webSocketServiceProvider).reconnectIfNeeded();
+      final consent = ref.read(consentProvider);
+      if (consent.privacyAcknowledged) {
+        debugPrint('App resumed: Verificando conectividade WebSocket...');
+        ref.read(webSocketServiceProvider).reconnectIfNeeded();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final consent = ref.watch(consentProvider);
+
     return MaterialApp(
       title: 'Shopping Comparator',
       debugShowCheckedModeBanner: false,
@@ -146,7 +137,9 @@ class _ShoppingComparatorAppState extends ConsumerState<ShoppingComparatorApp>
           ),
         ),
       ),
-      home: const HomeScreen(),
+      home: consent.privacyAcknowledged
+          ? const HomeScreen()
+          : const OnboardingScreen(),
     );
   }
 }

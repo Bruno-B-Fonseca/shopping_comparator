@@ -1,0 +1,695 @@
+[
+  {
+    "barcode": "7894900010015",
+    "name": "Coca-Cola 2L",
+    "unit": "2L",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900011012",
+    "name": "Coca-Cola Lata 350ml",
+    "unit": "350ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900011517",
+    "name": "Coca-Cola Lata 220ml",
+    "unit": "220ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900500011",
+    "name": "Fanta Laranja 2L",
+    "unit": "2L",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900501018",
+    "name": "Fanta Uva 2L",
+    "unit": "2L",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900700015",
+    "name": "Sprite 2L",
+    "unit": "2L",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900300017",
+    "name": "Guaraná Antarctica 2L",
+    "unit": "2L",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900301519",
+    "name": "Guaraná Antarctica Lata 350ml",
+    "unit": "350ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900110018",
+    "name": "Pepsi 2L",
+    "unit": "2L",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7896004700027",
+    "name": "Arroz Tio João Tipo 1 5kg",
+    "unit": "5kg ",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7896004700171",
+    "name": "Arroz Tio João Integral 1kg",
+    "unit": "1kg",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7896004700300",
+    "name": "Arroz Tio João Parboilizado 5kg",
+    "unit": "5kg ",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7896051100102",
+    "name": "Feijão Carioca Kicaldo 1kg",
+    "unit": "1kg",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7896051150114",
+    "name": "Feijão Preto Kicaldo 1kg",
+    "unit": "1kg",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7896051100126",
+    "name": "Feijão Carioca Camil 1kg",
+    "unit": "1kg",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891098000015",
+    "name": "Açúcar União Refinado 1kg",
+    "unit": "1kg",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891098000305",
+    "name": "Açúcar União Cristal 5kg",
+    "unit": "5kg ",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891098000220",
+    "name": "Açúcar União Mascavo 1kg",
+    "unit": "1kg",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024112203",
+    "name": "Sal Lebre Refinado 1kg",
+    "unit": "1kg",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024112302",
+    "name": "Sal Lebre Grosso 1kg",
+    "unit": "1kg",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150006014",
+    "name": "Leite Ninho Integral 1kg",
+    "unit": "1kg",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150011209",
+    "name": "Leite Ninho Integral 400g",
+    "unit": "400g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000100101",
+    "name": "Leite UHT Integral Italac 1L",
+    "unit": "1L",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000102105",
+    "name": "Leite UHT Desnatado Italac 1L",
+    "unit": "1L",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7893000730003",
+    "name": "Manteiga Aviação com Sal 200g",
+    "unit": "200g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7893000730010",
+    "name": "Manteiga Aviação sem Sal 200g",
+    "unit": "200g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7896034610228",
+    "name": "Requeijão Cremoso Catupiry 250g",
+    "unit": "250g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150019908",
+    "name": "Omo Lavagem Perfeita 1.6kg",
+    "unit": "1.6kg",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150020010",
+    "name": "Omo Multiação 800g",
+    "unit": "800g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150020034",
+    "name": "Omo Lavagem Perfeita 800g",
+    "unit": "800g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024132003",
+    "name": "Amaciante Downy Brisa Suave 1.5L",
+    "unit": "1.5L",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024132508",
+    "name": "Amaciante Ypê Aconchego 2L",
+    "unit": "2L",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024132607",
+    "name": "Detergente Ypê Neutro 500ml",
+    "unit": "500ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024132805",
+    "name": "Sabão em Pó Ypê 1kg",
+    "unit": "1kg",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7896375000029",
+    "name": "Papel Higiênico Neve Folha Dupla 30m (4 rolos)",
+    "unit": "30m (4 rolos)",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7896375100088",
+    "name": "Papel Toalha Snob Multiuso 2 rolos",
+    "unit": "2 rolos",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024133000",
+    "name": "Creme Dental Colgate Tripla Ação 90g",
+    "unit": "90g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024133604",
+    "name": "Escova Dental Colgate Classic",
+    "unit": "",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150003013",
+    "name": "Shampoo Seda Cachos Definidos 325ml",
+    "unit": "325ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150003020",
+    "name": "Condicionador Seda Cachos Definidos 325ml",
+    "unit": "325ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150005017",
+    "name": "Sabonete Dove Original 90g",
+    "unit": "90g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150005109",
+    "name": "Desodorante Rexona Clinical Feminino 50ml",
+    "unit": "50ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150005208",
+    "name": "Desodorante Rexona Clinical Masculino 50ml",
+    "unit": "50ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891058000015",
+    "name": "Café Pilão Torrado e Moído 500g",
+    "unit": "500g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891058000107",
+    "name": "Café Pilão Extra Forte 500g",
+    "unit": "500g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000062602",
+    "name": "Café 3 Corações Tradicional 500g",
+    "unit": "500g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000062619",
+    "name": "Café 3 Corações Extra Forte 500g",
+    "unit": "500g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7892840800017",
+    "name": "Nescau Cereal 270g",
+    "unit": "270g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7892840800024",
+    "name": "Nescau Cereal Power 270g",
+    "unit": "270g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900101012",
+    "name": "Achocolatado Toddynho 200ml",
+    "unit": "200ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150017003",
+    "name": "Biscoito Passatempo Recheado Chocolate 130g",
+    "unit": "130g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150017010",
+    "name": "Biscoito Passatempo Recheado Morango 130g",
+    "unit": "130g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150018000",
+    "name": "Biscoito Maizena Tradicional 200g",
+    "unit": "200g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150018024",
+    "name": "Biscoito Cream Cracker Tradicional 200g",
+    "unit": "200g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150031000",
+    "name": "Bolacha recheada Oreo Original 90g",
+    "unit": "90g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000444508",
+    "name": "Macarrão Espaguete Renata 500g",
+    "unit": "500g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000444607",
+    "name": "Macarrão Parafuso Renata 500g",
+    "unit": "500g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000444706",
+    "name": "Macarrão Penne Renata 500g",
+    "unit": "500g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000444805",
+    "name": "Macarrão Fusilli Renata 500g",
+    "unit": "500g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894904501012",
+    "name": "Molho de Tomate Pomarola Tradicional 340g",
+    "unit": "340g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894904502019",
+    "name": "Molho de Tomate Pomarola Refogado 340g",
+    "unit": "340g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150028000",
+    "name": "Atum Sólido Gomes da Costa em Óleo 170g",
+    "unit": "170g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150028017",
+    "name": "Atum Ralado Gomes da Costa em Água 170g",
+    "unit": "170g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150028109",
+    "name": "Sardinha em Óleo Gomes da Costa 125g",
+    "unit": "125g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024133406",
+    "name": "Milho Verde Quero 200g",
+    "unit": "200g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024133505",
+    "name": "Ervilha Verde Quero 200g",
+    "unit": "200g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150029007",
+    "name": "Extrato de Tomate Elefante 340g",
+    "unit": "340g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150030003",
+    "name": "Creme de Leite Nestlé 300g",
+    "unit": "300g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150030010",
+    "name": "Leite Condensado Moça 395g",
+    "unit": "395g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000444904",
+    "name": "Gelatina Dr. Oetker Morango 25g",
+    "unit": "25g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000445000",
+    "name": "Gelatina Dr. Oetker Uva 25g",
+    "unit": "25g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000445109",
+    "name": "Fermento em Pó Dona Benta 100g",
+    "unit": "100g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891000445208",
+    "name": "Fermento Biológico Fleischmann Seco 10g",
+    "unit": "10g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900201013",
+    "name": "Azeite de Oliva Gallo Extra Virgem 500ml",
+    "unit": "500ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900202010",
+    "name": "Azeite de Oliva Andorinha Extra Virgem 500ml",
+    "unit": "500ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024133703",
+    "name": "Vinagre Castelo Vinho Tinto 750ml",
+    "unit": "750ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891024133802",
+    "name": "Vinagre Castelo Maçã 750ml",
+    "unit": "750ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150027003",
+    "name": "Maionese Hellmann's Tradicional 500g",
+    "unit": "500g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150027027",
+    "name": "Maionese Hellmann's Sabor Limão 500g",
+    "unit": "500g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150027041",
+    "name": "Ketchup Hellmann's Tradicional 400g",
+    "unit": "400g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150027065",
+    "name": "Mostarda Hellmann's Amarela 400g",
+    "unit": "400g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900401011",
+    "name": "Batata Palha Yoki Tradicional 100g",
+    "unit": "100g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900402018",
+    "name": "Amendoim Yoki Japonês 150g",
+    "unit": "150g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150040002",
+    "name": "Barra de Cereal Nutry Banana e Aveia 25g",
+    "unit": "25g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150040019",
+    "name": "Barra de Cereal Nutry Chocolate 25g",
+    "unit": "25g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150041009",
+    "name": "Paçoca Rolha Amendopã 20g",
+    "unit": "20g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150042006",
+    "name": "Pipoca de Micro-ondas Yoki Manteiga 50g",
+    "unit": "50g",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150043003",
+    "name": "Chá Mate Leão Lata 340ml",
+    "unit": "340ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150043010",
+    "name": "Chá Leão Limão Lata 340ml",
+    "unit": "340ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7891150044000",
+    "name": "Água de Coco Sococo 200ml",
+    "unit": "200ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900601015",
+    "name": "Cerveja Skol Pilsen Lata 350ml",
+    "unit": "350ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900602012",
+    "name": "Cerveja Brahma Chopp Lata 350ml",
+    "unit": "350ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900603019",
+    "name": "Cerveja Antarctica Pilsen Lata 350ml",
+    "unit": "350ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900604016",
+    "name": "Cerveja Heineken Long Neck 330ml",
+    "unit": "330ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900605013",
+    "name": "Cerveja Budweiser Long Neck 330ml",
+    "unit": "330ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900606010",
+    "name": "Vinho Tinto Chalise Suave 750ml",
+    "unit": "750ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7894900607017",
+    "name": "Vinho Branco Casal Garcia Meio Seco 750ml",
+    "unit": "750ml",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7892840001016",
+    "name": "Nescafé Dolce Gusto Café Au Lait 16 cápsulas",
+    "unit": "16 cápsulas",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  },
+  {
+    "barcode": "7892840001023",
+    "name": "Nescafé Dolce Gusto Espresso 16 cápsulas",
+    "unit": "16 cápsulas",
+    "manufacturer": "",
+    "nutritionalInfo": ""
+  }
+]

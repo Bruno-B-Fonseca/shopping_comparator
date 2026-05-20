@@ -53,6 +53,7 @@ dependencies:
   shared_preferences: ^2.5.5
   crypto: ^3.0.7
   pointycastle: ^3.9.1
+  file_picker: ^11.0.2
 
 dev_dependencies:
   flutter_test:

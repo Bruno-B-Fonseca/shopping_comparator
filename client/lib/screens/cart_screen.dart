@@ -14,6 +14,10 @@ class CartScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cartItems = ref.watch(cartProvider);
+    final budget = ref.watch(budgetProvider);
+    final total = ref.watch(cartProvider.notifier).total;
+    final remaining = budget - total;
+
     final currencyFormat = NumberFormat.currency(
       locale: 'pt_BR',
       symbol: 'R\$',
@@ -29,126 +33,112 @@ class CartScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: cartItems.isEmpty
-          ? EmptyStateWidget(
-              icon: Icons.shopping_cart_outlined,
-              title: 'Carrinho vazio',
-              description: 'Comece adicionando produtos para comparar preços',
-              buttonLabel: 'Continuar comprando',
-              onButtonPressed: () {
-                ref.read(navigationProvider.notifier).state = 0;
-              },
-            )
-          : Column(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
               children: [
-                Expanded(
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Valor Limite',
+                    prefixText: 'R\$ ',
+                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) => ref.read(budgetProvider.notifier).state =
+                      double.tryParse(value) ?? 0.0,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Card(
+                        child: ListTile(
+                          title: const Text('Total'),
+                          subtitle: Text(currencyFormat.format(total)),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Card(
+                        child: ListTile(
+                          title: const Text('Restante'),
+                          subtitle: Text(
+                            currencyFormat.format(remaining),
+                            style: TextStyle(
+                              color: remaining >= 0 ? Colors.green : Colors.red,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          cartItems.isEmpty
+              ? Expanded(
+                  child: EmptyStateWidget(
+                    icon: Icons.shopping_cart_outlined,
+                    title: 'Carrinho vazio',
+                    description:
+                        'Comece adicionando produtos para comparar preços',
+                    buttonLabel: 'Continuar comprando',
+                    onButtonPressed: () {
+                      ref.read(navigationProvider.notifier).state = 0;
+                    },
+                  ),
+                )
+              : Expanded(
                   child: ListView.builder(
                     itemCount: cartItems.length,
                     itemBuilder: (context, index) {
                       final item = cartItems[index];
                       final product = StorageService.products.get(item.barcode);
 
-                      return Dismissible(
-                        key: Key('${item.barcode}_$index'),
-                        background: Container(
-                          color: Colors.red.withValues(alpha: 0.8),
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 16),
-                          child: const Icon(Icons.delete, color: Colors.white),
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                          backgroundImage: product?.photoUrl != null
+                              ? NetworkImage(
+                                  ImageService.sanitizeUrl(product!.photoUrl!),
+                                )
+                              : null,
+                          child: product?.photoUrl == null
+                              ? const Icon(Icons.shopping_bag)
+                              : null,
                         ),
-                        confirmDismiss: (direction) async {
-                          return await showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Remove item?'),
-                              content: const Text(
-                                'This item will be removed from your cart.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(context, false),
-                                  child: const Text('Cancel'),
-                                ),
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context, true),
-                                  child: const Text('Remove'),
-                                ),
-                              ],
+                        title: Text(product?.name ?? 'Unknown Product'),
+                        subtitle: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle_outline),
+                              onPressed: () => ref
+                                  .read(cartProvider.notifier)
+                                  .updateQuantity(index, -1),
                             ),
-                          );
-                        },
-                        onDismissed: (direction) {
-                          ref.read(cartProvider.notifier).removeItem(index);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Item removed from cart'),
+                            Text('${item.quantity.toInt()}'),
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline),
+                              onPressed: () => ref
+                                  .read(cartProvider.notifier)
+                                  .updateQuantity(index, 1),
                             ),
-                          );
-                        },
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
-                            backgroundImage: product?.photoUrl != null
-                                ? NetworkImage(
-                                    ImageService.sanitizeUrl(
-                                        product!.photoUrl!),
-                                  )
-                                : null,
-                            child: product?.photoUrl == null
-                                ? const Icon(Icons.shopping_bag)
-                                : null,
-                          ),
-                          title: Text(product?.name ?? 'Unknown Product'),
-                          subtitle: Text(
-                            '${item.quantity} x ${currencyFormat.format(item.unitPrice)}',
-                          ),
-                          trailing: Text(
-                            currencyFormat.format(item.total),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                          ],
+                        ),
+                        trailing: Text(
+                          currencyFormat.format(item.total),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       );
                     },
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Total:',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        currencyFormat.format(
-                          ref.read(cartProvider.notifier).total,
-                        ),
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+        ],
+      ),
     );
   }
 }

@@ -1,8 +1,10 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
+import 'image_service.dart';
 
 class HiveTileProvider extends TileProvider {
   final Box<Uint8List> tileBox;
@@ -12,7 +14,7 @@ class HiveTileProvider extends TileProvider {
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
     final key = '${coordinates.z}_${coordinates.x}_${coordinates.y}';
-    
+
     // 1. Tenta obter do cache local (Hive)
     final cachedTile = tileBox.get(key);
     if (cachedTile != null) {
@@ -38,9 +40,21 @@ class HiveTileProvider extends TileProvider {
 
   @override
   String getTileUrl(TileCoordinates coordinates, TileLayer options) {
-    return options.urlTemplate!
+    final template = options.urlTemplate;
+    if (template == null) return '';
+
+    final url = template
         .replaceAll('{z}', coordinates.z.toString())
         .replaceAll('{x}', coordinates.x.toString())
         .replaceAll('{y}', coordinates.y.toString());
+
+    // No Web, usamos o proxy se for URL externa
+    if (kIsWeb && !url.startsWith('/') && !url.startsWith('http://localhost')) {
+      final baseUrl = ImageService.baseUrl;
+      return '$baseUrl/proxy?url=${Uri.encodeComponent(url)}';
+    }
+
+    return url;
   }
 }
+

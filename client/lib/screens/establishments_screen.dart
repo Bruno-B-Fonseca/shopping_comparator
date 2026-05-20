@@ -52,7 +52,10 @@ class _EstablishmentsScreenState extends ConsumerState<EstablishmentsScreen> {
         setState(() {});
         // Garante que o mapa centralize no local carregado
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _mapController.move(_selectedPosition!, 16.0);
+          final pos = _selectedPosition;
+          if (pos != null && mounted) {
+            _mapController.move(pos, 16.0);
+          }
         });
       } else {
         await _moveToCurrentPosition();
@@ -61,13 +64,17 @@ class _EstablishmentsScreenState extends ConsumerState<EstablishmentsScreen> {
   }
 
   Future<void> _moveToCurrentPosition() async {
-    final pos = await LocationService.getCurrentPosition();
-    if (pos != null && mounted) {
-      final latLng = LatLng(pos.latitude, pos.longitude);
-      setState(() {
-        _selectedPosition = latLng;
-      });
-      _mapController.move(latLng, 16.0);
+    try {
+      final pos = await LocationService.getCurrentPosition();
+      if (pos != null && mounted) {
+        final latLng = LatLng(pos.latitude, pos.longitude);
+        setState(() {
+          _selectedPosition = latLng;
+        });
+        _mapController.move(latLng, 16.0);
+      }
+    } catch (e) {
+      debugPrint('EstablishmentsScreen: Erro ao mover para posição atual: $e');
     }
   }
 
@@ -85,9 +92,13 @@ class _EstablishmentsScreenState extends ConsumerState<EstablishmentsScreen> {
 
     LatLng? position = _selectedPosition;
     if (position == null) {
-      final current = await LocationService.getCurrentPosition();
-      if (current != null) {
-        position = LatLng(current.latitude, current.longitude);
+      try {
+        final current = await LocationService.getCurrentPosition();
+        if (current != null) {
+          position = LatLng(current.latitude, current.longitude);
+        }
+      } catch (e) {
+        debugPrint('EstablishmentsScreen: Erro ao obter posição para salvar: $e');
       }
     }
 
@@ -105,7 +116,9 @@ class _EstablishmentsScreenState extends ConsumerState<EstablishmentsScreen> {
     // Cálculo simples de perímetro (aproximado)
     // 1 grau lat ~ 111.111 metros
     final double degreeOffset = (perimeterMeters / 2) / 111111;
-    final id = auth.isOperator ? auth.locationId! : const Uuid().v4();
+    final id = (auth.isOperator && auth.locationId != null)
+        ? auth.locationId!
+        : const Uuid().v4();
     final isUpdate = StorageService.locations.containsKey(id);
 
     final loc = LocationModel(

@@ -1,8 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
+import '../models/product.dart';
 import '../providers/auth_provider.dart';
 import '../providers/consent_provider.dart';
 import '../services/storage_service.dart';
+import '../services/image_service.dart';
 import 'privacy_policy_screen.dart';
 
 /// Tela para configuração das credenciais de Operador do Local.
@@ -129,6 +134,27 @@ class _OperatorSettingsScreenState
                   child: const Text('Limpar Credenciais'),
                 ),
               ),
+            if (ref.watch(authProvider).isOperator) ...[
+              const SizedBox(height: 40),
+              // SEÇÃO: Importação (Apenas Operador)
+              const Text(
+                '📥 Importação de Dados',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              TextButton.icon(
+                onPressed: _importProductsJson,
+                icon: const Icon(Icons.file_upload),
+                label: const Text('Importar Produtos (JSON)'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const Text(
+                'O arquivo deve conter uma lista de produtos. Produtos já existentes (mesmo barcode) serão pulados.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
             const SizedBox(height: 40),
 
             // SEÇÃO: Privacidade e Consentimentos
@@ -256,6 +282,129 @@ class _OperatorSettingsScreenState
         ),
       ),
     );
+  }
+
+  Future<void> _importProductsJson() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final bytes = result.files.first.bytes;
+      if (bytes == null) return;
+
+      final content = utf8.decode(bytes);
+      final dynamic jsonData = jsonDecode(content);
+
+      if (jsonData is! List) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Formato inválido: o JSON deve ser uma lista de produtos.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      setState(() => _isLoading = true);
+      int importedCount = 0;
+      int skippedCount = 0;
+      int imagesSynced = 0;
+
+      final baseUrl = ImageService.baseUrl;
+
+      for (var item in jsonData) {
+        try {
+          final Map<String, dynamic> itemMap = Map<String, dynamic>.from(item);
+          final product = Product.fromJson(itemMap);
+
+          // Verifica se já existe
+          if (StorageService.products.containsKey(product.barcode)) {
+            skippedCount++;
+            continue;
+          }
+
+          // Tenta baixar a imagem externa para o MinIO local
+          String? finalPhotoUrl = product.photoUrl;
+          if (finalPhotoUrl != null &&
+              finalPhotoUrl.isNotEmpty &&
+              !finalPhotoUrl.startsWith(baseUrl) &&
+              (finalPhotoUrl.startsWith('http://') ||
+                  finalPhotoUrl.startsWith('https://'))) {
+            try {
+              debugPrint('Import: Baixando imagem externa -> $finalPhotoUrl');
+              final response = await http
+                  .get(Uri.parse(finalPhotoUrl))
+                  .timeout(const Duration(seconds: 10));
+
+              if (response.statusCode == 200) {
+                final localUrl = await ImageService.uploadImage(
+                  response.bodyBytes,
+                );
+                if (localUrl != null) {
+                  finalPhotoUrl = localUrl;
+                  imagesSynced++;
+                }
+              }
+            } catch (imgErr) {
+              debugPrint('Import: Erro ao baixar imagem para ${product.barcode}: $imgErr');
+            }
+          }
+
+          final updatedProduct = Product(
+            barcode: product.barcode,
+            name: product.name,
+            unit: product.unit,
+            manufacturer: product.manufacturer,
+            photoUrl: finalPhotoUrl,
+            nutritionalInfo: product.nutritionalInfo,
+          );
+
+          await StorageService.products.put(
+            updatedProduct.barcode,
+            updatedProduct,
+          );
+          importedCount++;
+        } catch (e) {
+          debugPrint('Erro ao importar produto individual: $e');
+        }
+      }
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Importação Concluída'),
+            content: Text(
+              'Sucesso: $importedCount produtos importados.\n'
+              'Imagens Localizadas: $imagesSynced.\n'
+              'Ignorados: $skippedCount produtos já existiam.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao importar arquivo: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _showDeleteDataDialog() {

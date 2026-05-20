@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:minio/minio.dart';
 import 'package:server/cluster_service.dart';
@@ -126,6 +127,28 @@ void main() async {
 
   final router = Router();
   final priceProcessor = PriceProcessor(aiEngine: aiEngine);
+
+  // Proxy for external images (fixes CORS on Web)
+  router.get('/proxy', (Request request) async {
+    final url = request.url.queryParameters['url'];
+    if (url == null) return Response.badRequest(body: 'Missing url parameter');
+
+    try {
+      print('SERVER: Proxying request for: $url');
+      final response = await http.get(Uri.parse(url));
+      return Response.ok(
+        response.bodyBytes,
+        headers: {
+          'Content-Type':
+              response.headers['content-type'] ?? 'application/octet-stream',
+          'Access-Control-Allow-Origin': '*',
+        },
+      );
+    } catch (e) {
+      print('SERVER PROXY ERROR: $e');
+      return Response.internalServerError(body: 'Proxy error: $e');
+    }
+  });
 
   // WebSocket handler
   router.get(

@@ -175,6 +175,14 @@ To improve image handling, scalability, and performance, MinIO was integrated as
 - **Frontend Changes**: Refactored `Product` model to use `photoUrl` instead of `photoBase64`, implemented `ImageService`, and updated UI to display images via `Image.network`.
 - **Infrastructure**: MinIO service added to `docker-compose.yml` with persistent volume mapping.
 
+### Image Proxy & Map Caching
+
+To ensure a seamless and robust user experience on the web, several architectural enhancements were made:
+
+- **Image Proxy**: A backend proxy (`/proxy`) was implemented to fetch external images (like those from Open Food Facts). This bypasses browser CORS restrictions and avoids "Mixed Content" errors by serving all external assets over the app's secure connection.
+- **Map Tile Caching**: To support offline usage and reduce API calls to OpenStreetMap, a `HiveTileProvider` was implemented. It caches map tiles in a local Hive box (`map_tiles`), enabling the map to function even without connectivity for cached regions.
+- **Onboarding & Privacy**: Replaced the startup consent dialog with a full-screen `OnboardingScreen`. This ensures that all required LGPD consents (Privacy, Location, AI) are gathered before any sensitive services (like WebSocket or Location) are initialized, improving both security and application stability.
+
 ## Coding Conventions
 
 - **Immutability**: Use `@JsonSerializable` and `Hive` for models. Prefer final fields.

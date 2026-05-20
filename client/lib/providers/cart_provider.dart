@@ -15,6 +15,21 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
     state = StorageService.cart.values.toList();
   }
 
+  void updateQuantity(int index, double delta) {
+    final item = state[index];
+    final newQuantity = (item.quantity + delta).clamp(0.1, 999.0);
+    
+    final newItem = CartItem(
+      barcode: item.barcode,
+      quantity: newQuantity,
+      unitPrice: item.unitPrice,
+      addedAt: item.addedAt,
+    );
+
+    StorageService.cart.putAt(index, newItem);
+    state = List.from(state)..[index] = newItem;
+  }
+
   void clear() {
     StorageService.cart.clear();
     state = [];
@@ -26,3 +41,5 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
 final cartProvider = StateNotifierProvider<CartNotifier, List<CartItem>>((ref) {
   return CartNotifier();
 });
+
+final budgetProvider = StateProvider<double>((ref) => 0.0);

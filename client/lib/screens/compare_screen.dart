@@ -42,18 +42,29 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   }
 
   Future<void> _initLocation() async {
-    final pos = await LocationService.getCurrentPosition();
-    if (pos != null) {
-      final newPos = LatLng(pos.latitude, pos.longitude);
-      setState(() {
-        _currentCenter = newPos;
-        _loading = false;
-      });
-      _mapController.move(newPos, 15.0);
-    } else {
-      setState(() {
-        _loading = false;
-      });
+    try {
+      final pos = await LocationService.getCurrentPosition();
+      if (pos != null && mounted) {
+        final newPos = LatLng(pos.latitude, pos.longitude);
+        setState(() {
+          _currentCenter = newPos;
+          _loading = false;
+        });
+        _mapController.move(newPos, 15.0);
+      } else {
+        if (mounted) {
+          setState(() {
+            _loading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('CompareScreen: Erro ao inicializar localização: $e');
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -107,7 +118,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         ],
       ),
       body: _loading
-          ? EmptyStateWidget(
+          ? const EmptyStateWidget(
               icon: Icons.location_searching,
               title: 'Obtendo sua localização',
               description:
@@ -148,10 +159,8 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                                   ),
                                   child: Text(
                                     'R\$ ${price.price.toStringAsFixed(2)}',
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onPrimary,
+                                    style: const TextStyle(
+                                      color: Colors.white,
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                     ),

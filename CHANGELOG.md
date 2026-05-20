@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.0] - 2026-05-20
+
+### Added
+- **Professional Onboarding Flow**: Implemented a comprehensive `OnboardingScreen` for first-time users, ensuring LGPD compliance through explicit consent for Privacy, Location, and AI Processing.
+- **Shopping Cart Budget & Balance**: Users can now set a budget for their shopping cart, with real-time tracking of the total and remaining balance.
+- **Offline Map Tile Cache**: Implemented `HiveTileProvider` to store OpenStreetMap tiles in a local Hive box, improving performance and allowing map visualization without an active internet connection for previously visited areas.
+- **Image Proxy Service**: Added a `/proxy` endpoint in the backend to handle requests for external images (Open Food Facts, etc.), resolving CORS and Mixed Content issues in the Flutter Web environment.
+- **Quantity Management**: Added increment/decrement controls for products in the shopping cart.
+- **Operator Product Editing**: Authorized operators can now edit product metadata directly from the `ScanScreen`.
+
+### Fixed
+- **Startup Stability**: Fixed "Null check operator" crashes by hardening `LocationService` and `SyncService` and delaying WebSocket initialization until privacy consent is granted.
+- **Web CORS/Security**: Resolved browser blocks when loading external assets by routing them through the internal proxy.
+- **WebSocket Robustness**: Enhanced reconnection logic and message decoding safety.
+
 ## [1.3.0] - 2026-05-18
 
 ### Added

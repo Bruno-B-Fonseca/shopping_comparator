@@ -1,69 +1,58 @@
-# Implementation Plan - Feature Enhancements & Privacy Fixes
+# Plan: Onboarding LGPD Flow and Startup Null Check Fix
 
-This plan covers the implementation of several improvements requested by the user, including map fixes, search navigation, privacy enforcement, offline map cache, and Open Food Facts integration.
+This plan aims to implement a professional onboarding flow for LGPD compliance and fix the "Null check operator" error occurring during application startup.
 
-## 1. CompareScreen Improvements
-- **Map Centering**: 
-    - Add a `MapController` to `_CompareScreenState`.
-    - Use `_mapController.move(_currentCenter, 15.0)` in `_initLocation` to programmatically center the map.
-- **Product Filter (Combobox)**:
-    - Add `_selectedBarcode` state variable.
-    - Implement a `DropdownButton` in the `AppBar` or a floating overlay.
-    - Options will include:
-        - "Todos do Carrinho" (Default)
-        - List of products currently in `StorageService.cart`.
-    - Update `MarkerLayer` to filter markers:
-        - If `_selectedBarcode` is set, show only prices for that barcode.
-        - If null, show prices for all barcodes present in the cart.
+## Objective
+- Implement a comprehensive `OnboardingScreen` for first-time users.
+- Ensure LGPD compliance with explicit consent for Privacy, Location, and AI Processing.
+- Fix the startup "Null check operator" error by delaying service initialization and hardening null-sensitive code.
 
-## 2. ProductSearchScreen Navigation
-- **Navigate to Scan**:
-    - Add an `IconButton(icon: Icon(Icons.add_shopping_cart))` to `_ProductResultTile`.
-    - When pressed, navigate to `ScanScreen(initialBarcode: item.product.barcode)`.
-- **Update ScanScreen**:
-    - Modify `ScanScreen` constructor to accept an optional `initialBarcode`.
-    - In `initState`, if `initialBarcode` is provided, call `_lookupProduct(initialBarcode)`.
+## Key Files & Context
+- `client/lib/main.dart`: App entry point and screen routing.
+- `client/lib/screens/onboarding_screen.dart`: (New) Onboarding and consent screen.
+- `client/lib/providers/consent_provider.dart`: Management of user consents.
+- `client/lib/services/sync_service.dart`: Global synchronization service.
+- `client/lib/services/location_service.dart`: Geolocation logic.
+- `client/lib/screens/compare_screen.dart`: Map-based comparison screen.
+- `client/lib/screens/establishments_screen.dart`: Establishment management screen.
 
-## 3. Privacy Enforcement in SyncService
-- **Fix Sync Leak**:
-    - Modify `SyncService._handleSyncRequest` to filter out private data.
-    - Only send `location_registration` if `locationId` does NOT start with `private_`.
-    - Only send `price_update` if `locationId` does NOT start with `private_`.
-- **Double Check**: Ensure `ChatMessage` sync also respects location privacy if applicable.
+## Implementation Steps
 
-## 4. Offline Map Tile Cache
-- **Custom TileProvider**:
-    - Create `HiveTileProvider` in `client/lib/services/map_tile_service.dart`.
-    - It will check a new Hive box `map_tiles` for the requested tile (key: `z_x_y`).
-    - If found, return the tile data.
-    - If not found, fetch from OSM, store in Hive, and return.
-- **Cache Management**: Add an option in `OperatorSettingsScreen` to "Limpar cache de mapas".
+### 1. Hardening Services and Models
+- [ ] **LocationService**: Add defensive checks and ensure it never throws null check errors even if permissions are in a weird state.
+- [ ] **SyncService**: Ensure it doesn't initialize or listen to streams if consent isn't granted or if the connection is still being established.
+- [ ] **Models**: Ensure `fromJson` and `toJson` are robust against missing fields.
 
-## 5. Open Food Facts (OFF) Integration
-- **Server-Side (Metadata Service)**:
-    - Update `server/lib/product_metadata_service.dart`.
-    - Add a step to query `https://world.openfoodfacts.org/api/v2/product/[barcode].json`.
-    - Extract `product_name`, `brands`, `quantity`, `image_url`, and `nutriments`.
-    - Merge this data with the AI/Web search results.
-- **Product Model Update**:
-    - Add `photoUrl` and `nutritionalInfo` fields to `Product` model.
-    - Run `build_runner` to update adapters and JSON logic.
-- **UI Updates**:
-    - Show product photo (avatar) in `_ProductResultTile` and `ScanScreen`.
-    - Show nutritional summary in `_ProductResultTile` or a details modal.
+### 2. Implementation of OnboardingScreen
+- [ ] Create `client/lib/screens/onboarding_screen.dart`.
+- [ ] Design a professional layout with:
+  - Welcome message and logo.
+  - Feature highlights.
+  - Interactive Terms and Privacy section with checkboxes.
+  - "Start" button enabled only after agreement.
+- [ ] Integrate with `PrivacyPolicyScreen`.
 
-## 6. Verification Plan
-- **Map**: Verify "Center my location" button moves the map to the user's coordinates.
-- **Search**: Verify clicking the cart icon on a search result leads to `ScanScreen` with the correct product loaded.
-- **Privacy**: Use two browser sessions. Add a price at an "Unknown Location" in session A. Verify it DOES NOT appear in session B's map or search.
-- **Offline Cache**: Turn off internet and verify map tiles already visited remain visible.
-- **OFF**: Scan a known product (e.g., Coca-Cola) and verify it fetches the correct name, photo, and info without manual typing.
+### 3. Update App Entry Point (main.dart)
+- [ ] Modify `ShoppingComparatorApp` to listen to `consentProvider`.
+- [ ] Use a `Consumer` or `watch` to determine whether to show `OnboardingScreen` or `HomeScreen`.
+- [ ] Remove the `showDialog` logic from `main.dart` as it's now handled by the onboarding screen.
 
-## Key Files
-- `client/lib/models/product.dart`
-- `client/lib/screens/compare_screen.dart`
-- `client/lib/screens/product_search_screen.dart`
-- `client/lib/screens/scan_screen.dart`
-- `client/lib/services/sync_service.dart`
-- `client/lib/services/storage_service.dart`
-- `server/lib/product_metadata_service.dart`
+### 4. Hardening UI Screens (Map Handling)
+- [ ] **CompareScreen**: 
+  - Ensure `_currentCenter` always has a default value.
+  - Use safe access for `filteredPrices` markers.
+  - Add loading state handling for map tiles.
+- [ ] **EstablishmentsScreen**:
+  - Make location-dependent logic safer.
+  - Avoid unsafe null assertions on `_selectedPosition`.
+
+### 5. SyncService Lifecycle Management
+- [ ] Ensure `SyncService` is only initialized when `HomeScreen` is active.
+- [ ] Add a "connectivity check" before sending initial `sync_request`.
+
+## Verification & Testing
+- [ ] **Fresh Start**: Clear browser cache/local storage and verify the onboarding flow appears.
+- [ ] **Consent Flow**: Verify that accepting terms leads to `HomeScreen`.
+- [ ] **Error Check**: Monitor console for "Null check operator" during startup.
+- [ ] **Map Test**: Verify that the map loads correctly on both screens after consent.
+- [ ] **Offline Behavior**: Verify that the app still works (offline mode) if the WebSocket connection is slow.

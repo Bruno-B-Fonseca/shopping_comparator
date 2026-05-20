@@ -104,26 +104,27 @@ class WebSocketService {
     if (_currentStatus == WebSocketStatus.connecting) return;
 
     _updateStatus(WebSocketStatus.connecting);
-    debugPrint('Connecting to WebSocket: $url');
+    debugPrint('WebSocket: Iniciando conexão com $url');
 
     try {
-      _channel = WebSocketChannel.connect(Uri.parse(url));
+      final channel = WebSocketChannel.connect(Uri.parse(url));
+      _channel = channel;
 
       // Usa .ready para saber quando a conexão foi de fato estabelecida
-      _channel!.ready
-          .then((_) {
-            debugPrint('WebSocket: Conexão estabelecida com sucesso!');
-            _reconnectAttempts = 0;
-            _updateStatus(WebSocketStatus.connected);
+      channel.ready.then((_) {
+        debugPrint('WebSocket: Conexão estabelecida com sucesso!');
+        _reconnectAttempts = 0;
+        _updateStatus(WebSocketStatus.connected);
 
-            // Solicita sincronização inicial de dados
-            sendMessage({'type': 'sync_request'});
-          })
-          .catchError((e) {
-            debugPrint('WebSocket: Erro ao validar prontidão: $e');
-          });
+        // Solicita sincronização inicial de dados
+        sendMessage({'type': 'sync_request'});
+      }).catchError((e) {
+        debugPrint('WebSocket: Erro na prontidão da conexão: $e');
+        _updateStatus(WebSocketStatus.disconnected);
+        _reconnect();
+      });
 
-      _channel!.stream.listen(
+      channel.stream.listen(
         (data) {
           // Garante status conectado ao receber qualquer dado
           if (_currentStatus != WebSocketStatus.connected) {
@@ -131,25 +132,29 @@ class WebSocketService {
           }
 
           try {
-            final Map<String, dynamic> message = jsonDecode(data);
+            if (data == null) {
+              debugPrint('WebSocket: Dados nulos recebidos no stream.');
+              return;
+            }
+            final Map<String, dynamic> message = jsonDecode(data.toString());
             _messageController.add(message);
           } catch (e) {
-            debugPrint('Error decoding message: $e');
+            debugPrint('WebSocket: Erro ao decodificar mensagem: $e | Data: $data');
           }
         },
         onDone: () {
-          debugPrint('WebSocket closed');
+          debugPrint('WebSocket: Conexão encerrada pelo servidor (onDone)');
           _updateStatus(WebSocketStatus.disconnected);
           _reconnect();
         },
         onError: (error) {
-          debugPrint('WebSocket error: $error');
+          debugPrint('WebSocket: Erro no stream: $error');
           _updateStatus(WebSocketStatus.disconnected);
           _reconnect();
         },
       );
     } catch (e) {
-      debugPrint('WebSocket connection failed: $e');
+      debugPrint('WebSocket: Falha crítica na tentativa de conexão: $e');
       _updateStatus(WebSocketStatus.disconnected);
       _reconnect();
     }
@@ -188,15 +193,16 @@ class WebSocketService {
   }
 
   void sendMessage(Map<String, dynamic> message) {
-    if (_channel != null && _currentStatus == WebSocketStatus.connected) {
+    final channel = _channel;
+    if (channel != null && _currentStatus == WebSocketStatus.connected) {
       try {
-        _channel!.sink.add(jsonEncode(message));
+        channel.sink.add(jsonEncode(message));
       } catch (e) {
-        debugPrint('Error sending message: $e');
+        debugPrint('WebSocket: Erro ao enviar mensagem: $e');
       }
     } else {
       debugPrint(
-        'Cannot send message: Status=$_currentStatus, Channel=${_channel != null}',
+        'WebSocket: Não foi possível enviar (Status=$_currentStatus, Channel=${channel != null})',
       );
     }
   }
@@ -204,7 +210,7 @@ class WebSocketService {
   void dispose() {
     _reconnectTimer?.cancel();
     _channel?.sink.close();
-    _messageController.close();
-    _statusController.close();
+    if (!_messageController.isClosed) _messageController.close();
+    if (!_statusController.isClosed) _statusController.close();
   }
 }

@@ -12,12 +12,27 @@ class ImageService {
     return 'http://localhost:3000'; // Default for local mobile dev
   }
 
-  /// Garante que a URL use o protocolo correto para evitar Mixed Content
+  /// Garante que a URL use o protocolo correto e passe pelo proxy no Web se for externa
   static String sanitizeUrl(String? url) {
-    if (url == null) return '';
-    if (kIsWeb && Uri.base.scheme == 'https' && url.startsWith('http://')) {
-      return url.replaceFirst('http://', 'https://');
+    if (url == null || url.isEmpty) return '';
+
+    // Se for URL externa no Web, usamos o nosso proxy para evitar problemas de CORS
+    if (kIsWeb) {
+      final isExternal = !url.startsWith('/') &&
+          !url.startsWith(baseUrl) &&
+          !url.startsWith('http://localhost') &&
+          !url.startsWith('https://localhost');
+
+      if (isExternal) {
+        return '$baseUrl/proxy?url=${Uri.encodeComponent(url)}';
+      }
+
+      // Correção de Mixed Content para URLs internas/locais
+      if (Uri.base.scheme == 'https' && url.startsWith('http://')) {
+        return url.replaceFirst('http://', 'https://');
+      }
     }
+
     return url;
   }
 
