@@ -1,0 +1,24 @@
+{
+  "workflows": {
+    "7DYP2an6ERPcRji7": {
+      "lastSyncedHash": "5a4cd07f9b1b37585f6b09ba3f128b00345bcf57b345eeae2421c479ec159821",
+      "lastSyncedAt": "2026-05-21T01:58:33.086Z",
+      "filename": "price-monitor.workflow.ts"
+    },
+    "8P4rQ0R4orZs4eiT": {
+      "lastSyncedHash": "fc3fbac5fdd079303ffeb7a7ef744cea1b6ea9a6280907e83f2db7e3f9d61c34",
+      "lastSyncedAt": "2026-05-21T17:49:36.774Z",
+      "filename": "lead-capture.workflow.ts"
+    },
+    "hJyACTkLUCJPkGvN": {
+      "lastSyncedHash": "b9327d0d7e21eced92b3308d5e31510f41b06c240b096da56214c7ab9f925945",
+      "lastSyncedAt": "2026-05-21T17:41:54.324Z",
+      "filename": "content-generator.workflow.ts"
+    },
+    "wr4eFr8hBypoNwDt": {
+      "lastSyncedHash": "70d2ce880a1baca5352d42b04003b64950ff7a87410b89c8e9df317eb13cedb7",
+      "lastSyncedAt": "2026-05-21T20:46:34.047Z",
+      "filename": "federation-guardian.workflow.ts"
+    }
+  }
+}

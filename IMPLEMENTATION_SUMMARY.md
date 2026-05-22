@@ -1,3 +1,37 @@
+# ✅ Implementação: GPI & Carga NFC-e (Fase de Excelência)
+
+## Novos Arquivos e Funcionalidades
+
+### 1. **`hub/lib/services/gpi_service.dart`** - Global Product Index
+- Motor de normalização de produtos usando Ollama ou Gemini.
+- Cache persistente em `config/gpi_db.json`.
+- Identificação de Categorias Canônicas.
+
+### 2. **`server/lib/invoice_service.dart`** - Parser de Notas Fiscais
+- Extração efêmera de dados de URLs NFC-e.
+- Deduplicação anônima por hash de URL.
+- Zero persistência de PII (LGPD compliant).
+
+## Arquivos Modificados
+
+### 1. **`server/bin/server.dart`**
+- Adicionada rota `POST /bulk-import/invoice`.
+- Validação HMAC de operadores para importação em lote.
+- Transmissão de preços com selo `isOfficial`.
+
+### 2. **`client/lib/models/price_update.dart`**
+- Adicionado campo `verificationLevel` (Manual, Nota, Oficial).
+- Regenerado código via `build_runner`.
+
+### 3. **`client/lib/screens/operator_settings_screen.dart`**
+- Novo botão: "Carga de Preços via NFC-e".
+- Integração com scanner de QR Code e assinatura HMAC.
+
+## 🏆 Selos de Confiança (Trust Badges)
+- **Verified Product**: Metadados validados pelo Hub Nacional (GPI).
+- **Official Price**: Preço validado via NFC-e ou por Operador do Local.
+- Visíveis em `ProductSearchScreen` e `ScanScreen`.
+
 # ✅ Implementação Completa - LGPD + Segurança Reforçada
 
 ## Novos Arquivos Criados

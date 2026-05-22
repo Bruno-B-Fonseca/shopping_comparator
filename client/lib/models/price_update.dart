@@ -21,12 +21,16 @@ class PriceUpdate extends HiveObject {
   @HiveField(4)
   final String? messageId;
 
+  @HiveField(5)
+  final int verificationLevel; // 0: Manual, 1: Invoice Proof, 2: Official (Operator)
+
   PriceUpdate({
     required this.barcode,
     required this.locationId,
     required this.price,
     required this.timestamp,
     this.messageId,
+    this.verificationLevel = 0,
   });
 
   factory PriceUpdate.fromJson(Map<String, dynamic> json) =>

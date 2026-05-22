@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:image_editor_plus/image_editor_plus.dart';
+import 'package:pro_image_editor/pro_image_editor.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/image_service.dart';
@@ -42,7 +42,17 @@ class _ProductImagePickerState extends ConsumerState<ProductImagePicker> {
       if (!mounted) return;
       final editedImage = await Navigator.push<Uint8List?>(
         context,
-        MaterialPageRoute(builder: (context) => ImageEditor(image: imageBytes)),
+        MaterialPageRoute(
+          builder: (context) => ProImageEditor.memory(
+            imageBytes,
+            configs: const ProImageEditorConfigs(),
+            callbacks: ProImageEditorCallbacks(
+              onImageEditingComplete: (Uint8List bytes) async {
+                Navigator.pop(context, bytes);
+              },
+            ),
+          ),
+        ),
       );
 
       if (editedImage != null) {

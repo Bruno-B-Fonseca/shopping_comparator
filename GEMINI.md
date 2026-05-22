@@ -183,6 +183,20 @@ To ensure a seamless and robust user experience on the web, several architectura
 - **Map Tile Caching**: To support offline usage and reduce API calls to OpenStreetMap, a `HiveTileProvider` was implemented. It caches map tiles in a local Hive box (`map_tiles`), enabling the map to function even without connectivity for cached regions.
 - **Onboarding & Privacy**: Replaced the startup consent dialog with a full-screen `OnboardingScreen`. This ensures that all required LGPD consents (Privacy, Location, AI) are gathered before any sensitive services (like WebSocket or Location) are initialized, improving both security and application stability.
 
+### Global Product Index (GPI) & Normalization
+
+To ensure data integrity across the federated network, a Global Product Index was implemented:
+- **Hub-side Validation**: The Hub now provides a `GpiService` that uses AI (Ollama/Gemini) to normalize product metadata (names, categories).
+- **Canonical Categories**: Introduced a hierarchical category system to allow comparison of products across different establishments even without identical EANs (e.g., local bakery items).
+- **Verification Badges**: Products and prices validated by the Hub or establishment operators receive "Verified" and "Official" badges in the UI.
+
+### Bulk Price Update via NFC-e
+
+To enable rapid and reliable data population, establishment operators can now update prices in batch:
+- **Invoice Parsing**: A backend `InvoiceService` extracts product/price data from SEFAZ QR codes ephemerally.
+- **Privacy First**: All PII (CPF, transaction IDs) is discarded in memory before any data is persisted or federated.
+- **HMAC Security**: Bulk updates are signed with HMAC-SHA256 using the establishment's private password to prevent unauthorized price injections.
+
 ## Coding Conventions
 
 - **Immutability**: Use `@JsonSerializable` and `Hive` for models. Prefer final fields.

@@ -3,11 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:crypto/crypto.dart';
+import 'package:uuid/uuid.dart';
 import '../models/product.dart';
 import '../providers/auth_provider.dart';
 import '../providers/consent_provider.dart';
+import '../providers/websocket_provider.dart';
 import '../services/storage_service.dart';
 import '../services/image_service.dart';
+import '../widgets/barcode_scanner_widget.dart';
+import '../widgets/confidence_thermometer.dart';
 import 'privacy_policy_screen.dart';
 
 /// Tela para configuração das credenciais de Operador do Local.
@@ -91,6 +96,10 @@ class _OperatorSettingsScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // SEÇÃO: Reputação
+            const ConfidenceThermometer(),
+            const SizedBox(height: 24),
+
             // SEÇÃO: Operador
             const Text(
               '👤 Configuração de Operador',
@@ -150,8 +159,17 @@ class _OperatorSettingsScreenState
                   foregroundColor: Theme.of(context).colorScheme.primary,
                 ),
               ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _isLoading ? null : _importViaInvoice,
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Carga de Preços via NFC-e (Nota Fiscal)'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.deepPurple,
+                ),
+              ),
               const Text(
-                'O arquivo deve conter uma lista de produtos. Produtos já existentes (mesmo barcode) serão pulados.',
+                'O arquivo deve conter uma lista de produtos. Produtos já existentes (mesmo barcode) serão pulados. O scan de nota fiscal atualiza os preços do estabelecimento.',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
@@ -400,6 +418,92 @@ class _OperatorSettingsScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erro ao importar arquivo: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _importViaInvoice() async {
+    final String? invoiceUrl = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (context) => const BarcodeScannerWidget()),
+    );
+
+    if (invoiceUrl == null || !mounted) return;
+
+    if (!invoiceUrl.startsWith('http')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('QR Code inválido: não é uma URL SEFAZ.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final auth = ref.read(authProvider);
+      final locationId = auth.locationId;
+      final locationPassword = auth.locationPassword;
+
+      if (locationId == null || locationPassword == null) {
+        throw Exception('Credenciais de operador não configuradas.');
+      }
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final messageId = const Uuid().v4();
+      final messageToSign = '$invoiceUrl$timestamp$messageId';
+
+      final key = utf8.encode(locationPassword);
+      final hmac = Hmac(sha256, key);
+      final signature = hmac.convert(utf8.encode(messageToSign)).toString();
+
+      final wsUrl = ref.read(webSocketServiceProvider).currentUrl;
+      if (wsUrl == null) throw Exception('Não conectado ao servidor.');
+
+      final baseUrl = wsUrl.replaceFirst('ws', 'http').replaceFirst('/ws', '');
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/bulk-import/invoice'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'url': invoiceUrl,
+              'locationId': locationId,
+              'signature': signature,
+              'timestamp': timestamp,
+              'messageId': messageId,
+            }),
+          )
+          .timeout(const Duration(seconds: 45));
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Importação NFC-e'),
+              content: Text(result['message'] ?? 'Sucesso!'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        throw Exception(
+          'Erro no servidor (${response.statusCode}): ${response.body}',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao importar nota: $e')),
         );
       }
     } finally {

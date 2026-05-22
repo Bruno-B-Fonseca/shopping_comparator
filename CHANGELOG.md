@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.0] - 2026-05-20
+
+### Added
+- **Global Product Index (GPI)**: Implemented federated product normalization.
+  - Hub-side `GpiService` with Ollama and Gemini engines.
+  - Server-side GPI-first lookup logic in `ProductMetadataService`.
+  - Trust badges ("Verified") for products validated by the Hub.
+- **Bulk Price Update (NFC-e)**: Massive price updates via Fiscal Invoices.
+  - Backend `InvoiceService` with anonymous ephemeral parsing of SEFAZ URLs.
+  - Operator-only "Carga de Preços via NFC-e" feature with HMAC security.
+  - Automated AI registration for products discovered via invoices.
+  - "Verified User" badges for official prices in search and scan results.
+- **Verification Levels**: Added 3-tier trust system (Manual, Invoice Proof, Official Operator) to `PriceUpdate` model.
+
 ## [1.4.0] - 2026-05-20
 
 ### Added

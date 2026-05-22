@@ -4,6 +4,7 @@ import '../providers/navigation_provider.dart';
 import '../services/sync_service.dart';
 import 'scan_screen.dart';
 import 'cart_screen.dart';
+import 'shopping_list_screen.dart';
 import 'compare_screen.dart';
 import 'product_search_screen.dart';
 import 'establishments_screen.dart';
@@ -15,6 +16,7 @@ class HomeScreen extends ConsumerWidget {
   static const List<Widget> _screens = [
     ScanScreen(),
     CartScreen(),
+    ShoppingListScreen(),
     CompareScreen(),
     ProductSearchScreen(),
     EstablishmentsScreen(),
@@ -55,6 +57,7 @@ class HomeScreen extends ConsumerWidget {
             label: 'Scan',
           ),
           NavigationDestination(icon: Icon(Icons.shopping_cart), label: 'Cart'),
+          NavigationDestination(icon: Icon(Icons.list_alt), label: 'Listas'),
           NavigationDestination(icon: Icon(Icons.map), label: 'Compare'),
           NavigationDestination(icon: Icon(Icons.search), label: 'Pesquisa'),
           NavigationDestination(icon: Icon(Icons.store), label: 'Locais'),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -11,20 +12,23 @@ class ClusterService {
   final String hubUrl;
   final String region;
   final String serverId;
-  final String locationId; // Novo
-  final String locationPassword; // Novo
+  final String locationId;
+  final String locationPassword;
   final String publicWsUrl;
 
   late WebSocketChannel _hubChannel;
   final Function(Map<String, dynamic> payload, String originServerId)
   onRelayMessage;
 
+  // Gerenciamento de promessas de resposta do GPI
+  final Map<String, Completer<Map<String, dynamic>?>> _gpiRequests = {};
+
   ClusterService({
     required this.hubUrl,
     required this.region,
     required this.publicWsUrl,
-    required this.locationId, // Novo
-    required this.locationPassword, // Novo
+    required this.locationId,
+    required this.locationPassword,
     required this.onRelayMessage,
   }) : serverId = const Uuid().v4();
 
@@ -37,7 +41,7 @@ class ClusterService {
       jsonEncode({
         fieldType: msgRegister,
         fieldServerId: serverId,
-        fieldLocationId: locationId, // Novo
+        fieldLocationId: locationId,
         fieldRegion: region,
         fieldWsUrl: publicWsUrl,
       }),
@@ -57,7 +61,7 @@ class ClusterService {
   void _handleHubMessage(Map<String, dynamic> msg) {
     final type = msg[fieldType];
     switch (type) {
-      case msgAuthChallenge: // Novo: Responder ao desafio
+      case msgAuthChallenge:
         final nonce = msg[fieldNonce] as String;
         final key = utf8.encode(locationPassword);
         final bytes = utf8.encode(nonce);
@@ -78,10 +82,59 @@ class ClusterService {
       case msgRelay:
         onRelayMessage(msg[fieldPayload], msg[fieldOriginServerId] as String);
         break;
+      case msgReputationUpdate:
+        // Encapsula como se fosse um relay para o broadcast local
+        onRelayMessage(msg, 'hub'); 
+        break;
       case msgPeersUpdate:
         _log.info('Peers updated: ${msg[fieldPeers]}');
         break;
+      case msgGpiResponse:
+        final barcode = msg[fieldBarcode] as String;
+        final payload = msg[fieldPayload];
+        if (_gpiRequests.containsKey(barcode)) {
+          _gpiRequests.remove(barcode)!.complete(payload != null ? Map<String, dynamic>.from(payload) : null);
+        }
+        break;
     }
+  }
+
+  Future<Map<String, dynamic>?> lookupGpi(String barcode) async {
+    final completer = Completer<Map<String, dynamic>?>();
+    _gpiRequests[barcode] = completer;
+
+    _hubChannel.sink.add(jsonEncode({
+      fieldType: msgGpiLookup,
+      fieldBarcode: barcode,
+    }));
+
+    // Timeout de 3 segundos para evitar travamento
+    return completer.future.timeout(const Duration(seconds: 3), onTimeout: () {
+      _gpiRequests.remove(barcode);
+      _log.warning('GPI Lookup timeout for $barcode');
+      return null;
+    });
+  }
+
+  void updateRegistration({required String wsUrl}) {
+    _hubChannel.sink.add(
+      jsonEncode({
+        fieldType: msgRegister,
+        fieldServerId: serverId,
+        fieldLocationId: locationId,
+        fieldRegion: region,
+        fieldWsUrl: wsUrl,
+        'status': 'ok',
+        'ai_version': '1.0.0',
+      }),
+    );
+  }
+
+  void proposeGpi(Map<String, dynamic> product) {
+    _hubChannel.sink.add(jsonEncode({
+      fieldType: msgGpiPropose,
+      fieldPayload: product,
+    }));
   }
 
   void publish(String topic, Map<String, dynamic> payload) {

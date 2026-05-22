@@ -23,13 +23,15 @@ class ProductAdapter extends TypeAdapter<Product> {
       manufacturer: fields[3] as String,
       photoUrl: fields[4] as String?,
       nutritionalInfo: fields[5] as String?,
+      isVerified: fields[6] as bool,
+      canonicalCategory: fields[7] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Product obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.barcode)
       ..writeByte(1)
@@ -41,7 +43,11 @@ class ProductAdapter extends TypeAdapter<Product> {
       ..writeByte(4)
       ..write(obj.photoUrl)
       ..writeByte(5)
-      ..write(obj.nutritionalInfo);
+      ..write(obj.nutritionalInfo)
+      ..writeByte(6)
+      ..write(obj.isVerified)
+      ..writeByte(7)
+      ..write(obj.canonicalCategory);
   }
 
   @override
@@ -66,6 +72,8 @@ Product _$ProductFromJson(Map<String, dynamic> json) => Product(
       manufacturer: json['manufacturer'] as String,
       photoUrl: json['photoUrl'] as String?,
       nutritionalInfo: json['nutritionalInfo'] as String?,
+      isVerified: json['isVerified'] as bool? ?? false,
+      canonicalCategory: json['canonicalCategory'] as String?,
     );
 
 Map<String, dynamic> _$ProductToJson(Product instance) => <String, dynamic>{
@@ -75,4 +83,6 @@ Map<String, dynamic> _$ProductToJson(Product instance) => <String, dynamic>{
       'manufacturer': instance.manufacturer,
       'photoUrl': instance.photoUrl,
       'nutritionalInfo': instance.nutritionalInfo,
+      'isVerified': instance.isVerified,
+      'canonicalCategory': instance.canonicalCategory,
     };

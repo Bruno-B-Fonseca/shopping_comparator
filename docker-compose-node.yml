@@ -1,0 +1,39 @@
+# docker-compose-node.yml (Infraestrutura de Estabelecimento - L1)
+version: '3.8'
+
+services:
+  websocket:
+    build:
+      context: ./server
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      # Aponta para o endereço público do seu Hub Central
+      - HUB_URL=${HUB_URL:-ws://hub.shopcomp.org:3001}
+      - REGION=${REGION:-default}
+      - LOCATION_ID=${LOCATION_ID}
+      - LOCATION_PASSWORD=${LOCATION_PASSWORD}
+      # Configurações de IA local opcional ou uso do serviço central
+      - AI_PROVIDER=ollama
+      - OLLAMA_URL=${OLLAMA_URL:-http://localhost:11434}
+    restart: always
+
+  web:
+    build:
+      context: .
+      dockerfile: ./web-server/Dockerfile
+    ports:
+      - "8081:80"
+    restart: always
+    depends_on:
+      - websocket
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --url http://web:80 --no-autoupdate
+    restart: always
+    depends_on:
+      - web

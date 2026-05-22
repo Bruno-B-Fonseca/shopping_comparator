@@ -128,7 +128,8 @@ class _ProductSearchScreenState extends ConsumerState<ProductSearchScreen> {
           final matchesProduct =
               p.name.toLowerCase().contains(_query) ||
               p.manufacturer.toLowerCase().contains(_query) ||
-              p.barcode.contains(_query);
+              p.barcode.contains(_query) ||
+              (p.canonicalCategory?.toLowerCase().contains(_query) ?? false);
 
           if (matchesProduct) return true;
 
@@ -217,13 +218,32 @@ class _ProductResultTile extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        item.product.name,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.product.name,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          if (item.product.isVerified)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 4.0),
+                              child: Icon(Icons.verified, color: Colors.blue, size: 16),
+                            ),
+                          if (item.product.isLocal)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4.0),
+                              child: Tooltip(
+                                message: 'Produção Local / Artesanal',
+                                child: Icon(Icons.home_work, color: Colors.orange.shade700, size: 16),
+                              ),
+                            ),
+                        ],
                       ),
                       Text(
-                        '${item.product.manufacturer} • ${item.product.unit}',
+                        '${item.product.manufacturer}${item.product.canonicalCategory != null ? ' • ${item.product.canonicalCategory}' : ''} • ${item.product.unit}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -313,13 +333,25 @@ class _ProductResultTile extends ConsumerWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'R\$ ${item.lowestPrice!.price.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.primary,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'R\$ ${item.lowestPrice!.price.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                            if (item.lowestPrice!.verificationLevel == 2)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 6.0),
+                                child: Tooltip(
+                                  message: 'Preço Oficial (Validado pelo Estabelecimento)',
+                                  child: Icon(Icons.verified_user, color: Colors.blue, size: 16),
+                                ),
+                              ),
+                          ],
                         ),
                         Row(
                           children: [
@@ -376,6 +408,9 @@ class _ProductResultTile extends ConsumerWidget {
       text: item.product.manufacturer,
     );
     final unitController = TextEditingController(text: item.product.unit);
+    final categoryController = TextEditingController(
+      text: item.product.canonicalCategory ?? '',
+    );
     final nutritionController = TextEditingController(
       text: item.product.nutritionalInfo ?? '',
     );
@@ -438,6 +473,12 @@ class _ProductResultTile extends ConsumerWidget {
                   ),
                 ),
                 TextField(
+                  controller: categoryController,
+                  decoration: const InputDecoration(
+                    labelText: 'Categoria Canônica (ex: PADARIA > PAO)',
+                  ),
+                ),
+                TextField(
                   controller: nutritionController,
                   decoration: const InputDecoration(
                     labelText: 'Info Nutricional',
@@ -461,6 +502,10 @@ class _ProductResultTile extends ConsumerWidget {
                   unit: unitController.text.trim(),
                   nutritionalInfo: nutritionController.text.trim(),
                   photoUrl: currentPhotoUrl,
+                  isVerified: item.product.isVerified,
+                  canonicalCategory: categoryController.text.trim().isEmpty
+                      ? null
+                      : categoryController.text.trim(),
                 );
 
                 StorageService.products.put(

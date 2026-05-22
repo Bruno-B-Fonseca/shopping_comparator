@@ -9,8 +9,12 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:logging/logging.dart';
 import 'package:uuid/uuid.dart';
 import '../lib/protocol.dart';
+import '../lib/services/gpi_service.dart';
+import '../lib/services/reputation_service.dart';
 
 final Logger _log = Logger('Hub');
+final GpiService _gpiService = GpiService();
+final ReputationService _reputationService = ReputationService();
 
 class ServerInfo {
   final String id;
@@ -36,6 +40,10 @@ final servers = <String, ServerInfo>{};
 final channelToServerId = <WebSocketChannel, String>{};
 final pendingChallenges = <String, String>{};
 _UpstreamHubLink? _upstreamLink;
+
+// Cache para cruzamento de fatos (Reputação)
+// barcode_locationId -> { hash: timestamp }
+final Map<String, List<Map<String, dynamic>>> _recentManualUpdates = {};
 
 String _generateNonce() {
   final random = Random.secure();
@@ -99,10 +107,69 @@ Future<HttpServer> serveHub(InternetAddress address, int port) async {
   // Start heartbeat timers
   Timer.periodic(const Duration(seconds: 10), (_) => _sendPings());
   Timer.periodic(const Duration(seconds: 5), (_) => _checkTimeouts());
+  
+  // Lógica de resfriamento (Decay) a cada 24 horas (ou 1 min para teste em dev)
+  Timer.periodic(const Duration(hours: 24), (_) => _reputationService.applyDecay());
 
   final server = await ioshelf.serve(handler, address, port);
   _log.info('Hub listening on ws://${server.address.host}:${server.port}');
   return server;
+}
+
+void _handlePriceConvergence(Map<String, dynamic> msg) {
+  final payload = msg[fieldPayload];
+  if (payload == null) return;
+
+  final barcode = payload['barcode'] as String?;
+  final locationId = payload['locationId'] as String?;
+  final price = payload['price'] as double?;
+  final level = payload['verificationLevel'] as int? ?? 0;
+  final contributorHash = msg[fieldContributorHash] as String?;
+
+  if (barcode == null || locationId == null || price == null) return;
+
+  final key = '${barcode}_$locationId';
+
+  if (level >= 2) {
+    // PREÇO OFICIAL: Verifica se alguém acertou antes
+    final candidates = _recentManualUpdates[key];
+    if (candidates != null) {
+      final now = DateTime.now();
+      // Filtra candidatos da última hora que bateram o preço exato
+      for (var cand in List.from(candidates)) {
+        final candHash = cand['hash'] as String;
+        final candPrice = cand['price'] as double;
+        final candTime = DateTime.parse(cand['timestamp']);
+
+        if (now.difference(candTime).inHours <= 1 && candPrice == price) {
+          // BÔNUS! O usuário acertou a verdade oficial
+          _reputationService.addBonus(candHash, 5);
+          
+          // Notifica a rede sobre o ganho de reputação (para o termômetro do usuário)
+          _broadcast(jsonEncode({
+            fieldType: msgReputationUpdate,
+            fieldContributorHash: candHash,
+            fieldBonus: 5,
+          }));
+        }
+      }
+      // Limpa cache do item após validação oficial
+      _recentManualUpdates.remove(key);
+    }
+  } else if (contributorHash != null) {
+    // PREÇO MANUAL: Adiciona ao cache para futura validação
+    _recentManualUpdates.putIfAbsent(key, () => []).add({
+      'hash': contributorHash,
+      'price': price,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+
+    // Mantém o cache pequeno: remove itens com mais de 2 horas
+    _recentManualUpdates[key]!.removeWhere((cand) {
+      final time = DateTime.parse(cand['timestamp']);
+      return DateTime.now().difference(time).inHours > 2;
+    });
+  }
 }
 
 void _sendPings() {
@@ -301,11 +368,69 @@ void _handleMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
     case 'location_registration':
     case 'price_update':
     case 'chat_message':
+      // Injeta Trust Score se o hash estiver presente
+      final contributorHash = msg[fieldContributorHash];
+      if (contributorHash != null) {
+        msg[fieldTrustScore] = _reputationService.getScore(contributorHash);
+      }
+
+      // Lógica de bônus para convergência de preços
+      if (type == 'price_update') {
+        _handlePriceConvergence(msg);
+      }
+
       // Se receber estas mensagens diretamente de um nó, trata como se fosse um publish implícito para relay
       _broadcast(jsonEncode(msg), exclude: channel);
       if (_upstreamLink != null && _upstreamLink!.isConnected) {
         _upstreamLink!.send(msg);
       }
+      break;
+
+    case msgGpiLookup:
+      final barcode = msg[fieldBarcode] as String;
+      final product = _gpiService.lookup(barcode);
+      if (product != null) {
+        channel.sink.add(jsonEncode({
+          fieldType: msgGpiResponse,
+          fieldBarcode: barcode,
+          fieldPayload: product,
+        }));
+        _log.info('GPI Lookup hit for $barcode');
+      } else {
+        // Se não tem no Hub, envia para cima ou responde null
+        if (_upstreamLink != null && _upstreamLink!.isConnected) {
+          _upstreamLink!.send(msg);
+        } else {
+          channel.sink.add(jsonEncode({
+            fieldType: msgGpiResponse,
+            fieldBarcode: barcode,
+            fieldPayload: null,
+          }));
+        }
+      }
+      break;
+
+    case msgGpiPropose:
+      final payload = msg[fieldPayload] as Map<String, dynamic>;
+      _log.info('Received GPI Proposal for ${payload['barcode']}');
+      
+      // Processa a proposta (Normalização via AI se disponível)
+      _gpiService.propose(payload).then((normalized) {
+        // Responde ao solicitante
+        channel.sink.add(jsonEncode({
+          fieldType: msgGpiResponse,
+          fieldBarcode: payload['barcode'],
+          fieldPayload: normalized,
+        }));
+        
+        // Se normalizou com sucesso, pode propagar para cima se necessário
+        if (_upstreamLink != null && _upstreamLink!.isConnected) {
+          _upstreamLink!.send({
+            fieldType: msgGpiPropose,
+            fieldPayload: normalized,
+          });
+        }
+      });
       break;
   }
 }
@@ -349,6 +474,7 @@ bool _validateMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
       return true;
     case msgUnregister:
     case msgPong:
+    case msgReputationUpdate:
     case 'product_registration':
     case 'location_registration':
     case 'price_update':

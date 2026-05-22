@@ -1,0 +1,135 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.61kB done
+#1 DONE 0.0s
+
+#2 [web internal] load build definition from Dockerfile
+#2 transferring dockerfile: 616B done
+#2 DONE 0.0s
+
+#3 [websocket internal] load build definition from Dockerfile
+#3 transferring dockerfile: 599B done
+#3 DONE 0.0s
+
+#4 [hub internal] load build definition from Dockerfile
+#4 transferring dockerfile: 361B done
+#4 DONE 0.0s
+
+#5 [hub internal] load metadata for docker.io/library/dart:stable
+#5 ...
+
+#6 [web internal] load metadata for ghcr.io/cirruslabs/flutter:stable
+#6 DONE 0.4s
+
+#7 [web internal] load metadata for docker.io/library/nginx:alpine
+#7 DONE 0.5s
+
+#5 [hub internal] load metadata for docker.io/library/dart:stable
+#5 DONE 0.5s
+
+#8 [web internal] load .dockerignore
+#8 transferring context: 258B done
+#8 DONE 0.0s
+
+#9 [hub internal] load .dockerignore
+#9 transferring context: 2B done
+#9 DONE 0.0s
+
+#10 [websocket internal] load .dockerignore
+#10 transferring context: 258B done
+#10 DONE 0.0s
+
+#11 [websocket internal] load build context
+#11 transferring context: 712B done
+#11 DONE 0.0s
+
+#12 [web build 1/4] FROM ghcr.io/cirruslabs/flutter:stable@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8
+#12 resolve ghcr.io/cirruslabs/flutter:stable@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8 0.0s done
+#12 DONE 0.0s
+
+#13 [web stage-1 1/4] FROM docker.io/library/nginx:alpine@sha256:2f07d83bf561b506400dc183b1b2003803e39efbd22451f848adaba14d28c7c7
+#13 resolve docker.io/library/nginx:alpine@sha256:2f07d83bf561b506400dc183b1b2003803e39efbd22451f848adaba14d28c7c7 0.0s done
+#13 DONE 0.0s
+
+#14 [hub build 1/7] FROM docker.io/library/dart:stable@sha256:1bc3667e7e5d647bf0f00d62673790b06719ba39e108776a7cc3529887e81fb7
+#14 resolve docker.io/library/dart:stable@sha256:1bc3667e7e5d647bf0f00d62673790b06719ba39e108776a7cc3529887e81fb7 0.0s done
+#14 DONE 0.0s
+
+#15 [websocket 4/6] COPY pubspec.* ./
+#15 CACHED
+
+#16 [websocket 5/6] RUN dart pub get
+#16 CACHED
+
+#17 [websocket 3/6] WORKDIR /app
+#17 CACHED
+
+#18 [websocket 2/6] RUN apt-get update && apt-get install -y tesseract-ocr && rm -rf /var/lib/apt/lists/*
+#18 CACHED
+
+#19 [websocket 6/6] COPY . .
+#19 CACHED
+
+#20 [hub internal] load build context
+#20 transferring context: 1.07kB done
+#20 DONE 0.0s
+
+#21 [web internal] load build context
+#21 transferring context: 221B 0.1s done
+#21 DONE 0.1s
+
+#22 [hub stage-1 1/3] COPY --from=build /runtime/ /
+#22 CACHED
+
+#23 [hub build 5/7] COPY . .
+#23 CACHED
+
+#24 [hub build 6/7] RUN dart pub get --offline
+#24 CACHED
+
+#25 [hub build 7/7] RUN dart compile exe bin/hub.dart -o /app/bin/hub
+#25 CACHED
+
+#26 [hub build 4/7] RUN dart pub get
+#26 CACHED
+
+#27 [hub stage-1 2/3] COPY --from=build /app/bin/hub /app/bin/hub
+#27 CACHED
+
+#28 [hub build 3/7] COPY pubspec.* ./
+#28 CACHED
+
+#29 [hub build 2/7] WORKDIR /app
+#29 CACHED
+
+#30 [hub stage-1 3/3] COPY --from=build /app/config /config
+#30 CACHED
+
+#31 [web build 2/4] WORKDIR /app
+#31 CACHED
+
+#32 [web build 3/4] COPY client/pubspec.* ./
+#32 CACHED
+
+#33 [web build 4/4] RUN flutter pub get
+#33 CACHED
+
+#34 [hub] exporting to docker image format
+#34 exporting layers done
+#34 exporting manifest sha256:e35ad60ef989ca5b009d6e0c0391de37dec86f99442b37bc42a4be94340def59 0.0s done
+#34 exporting config sha256:f54c60dc1431b92d880567b3550cceb8153125d044a19a430107e73ff8875160
+#34 exporting config sha256:f54c60dc1431b92d880567b3550cceb8153125d044a19a430107e73ff8875160 done
+#34 sending tarball 0.1s done
+#34 CANCELED
+
+#35 [web stage-1 2/4] COPY --from=build /app/build/web /usr/share/nginx/html
+#35 ERROR: failed to calculate checksum of ref 62p4florv09kdpgq3vz028zwd::nfbjf9gegrs078oxzc27fbdxc: "/app/build/web": not found
+
+#36 [websocket] exporting to docker image format
+#36 exporting layers done
+#36 exporting manifest sha256:37ccc75a3ff61cacaa783eb28e9593e3927d1e7167e0a0df1af0874b01de3da5 0.0s done
+#36 exporting config sha256:90ddb6eb573768cb7d1dccbda886faad4837c381f6bc3eac9088d6da2b194a36 done
+#36 sending tarball 0.1s done
+#36 CANCELED
+------
+ > [web stage-1 2/4] COPY --from=build /app/build/web /usr/share/nginx/html:
+------

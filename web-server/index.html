@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>shopcomp.org | Transparência no Consumo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --black: #000; --white: #fff; --gray: #d4d4d4; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; color: var(--black); background: var(--white); margin: 0; padding: 0; line-height: 1.2; }
+        
+        .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+        
+        /* Grid Layout */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; border-top: 2px solid var(--black); padding-top: 2rem; }
+        
+        header { padding: 4rem 0; }
+        h1 { font-size: 4rem; font-weight: 700; letter-spacing: -0.05em; margin: 0; }
+        .hero-sub { font-size: 1.5rem; font-weight: 300; margin-top: 1rem; color: #666; }
+
+        .feature-block { border: 1px solid var(--black); padding: 2rem; min-height: 300px; }
+        .feature-block h3 { margin-top: 0; font-size: 1.5rem; text-transform: uppercase; }
+
+        .contact-section { margin-top: 4rem; border-top: 2px solid var(--black); padding-top: 2rem; }
+        
+        form { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+        .full-width { grid-column: span 2; }
+        input, select { width: 100%; padding: 1rem; border: 1px solid var(--black); font-family: inherit; }
+        button { background: var(--black); color: var(--white); padding: 1rem; border: none; cursor: pointer; font-weight: 700; text-transform: uppercase; }
+        
+        footer { margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--gray); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
+        
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } form { grid-template-columns: 1fr; } .full-width { grid-column: 1; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ShopComp.</h1>
+            <div class="hero-sub">Transparência radical no consumo e controle total do seu orçamento.</div>
+        </header>
+
+        <section class="grid">
+            <div class="feature-block">
+                <h3>O fim da surpresa no caixa</h3>
+                <p>O shopcomp.org resolve a dor de não saber o valor final da compra. Acompanhe seu saldo em tempo real, item a item.</p>
+            </div>
+            <div class="feature-block">
+                <h3>Federação ética de dados</h3>
+                <p>Nós não somos uma big tech coletando dados. Somos uma rede de locais que devolvem ao consumidor o poder de decisão.</p>
+            </div>
+        </section>
+
+        <section class="contact-section">
+            <h2>Seja um pioneiro</h2>
+            <form action="https://poison-subject-went-economic.trycloudflare.com/webhook/lead-capture" method="POST">
+                <input type="text" name="name" placeholder="Nome Completo" class="full-width" required>
+                <select name="type">
+                    <option value="pf">Consumidor (Pessoa Física)</option>
+                    <option value="pj">Estabelecimento (Pessoa Jurídica)</option>
+                </select>
+                <input type="email" name="email" placeholder="E-mail" required>
+                <button type="submit" class="full-width">Solicitar Acesso Antecipado</button>
+            </form>
+        </section>
+
+        <footer>
+            <p>ShopComp.org &copy; 2026. A evolução do consumo colaborativo.</p>
+        </footer>
+    </div>
+</body>
+</html>

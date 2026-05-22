@@ -14,10 +14,12 @@ import '../services/location_service.dart';
 import '../services/storage_service.dart';
 import '../services/websocket_service.dart';
 import '../services/image_service.dart';
+import '../services/reputation_service.dart';
 import '../widgets/barcode_scanner_widget.dart';
 import '../widgets/empty_state_widget.dart';
 import '../widgets/location_consent_dialog.dart';
 import '../widgets/product_image_picker.dart';
+import '../widgets/confidence_thermometer.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
   final String? initialBarcode;
@@ -206,6 +208,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       text: product.manufacturer,
     );
     final unitController = TextEditingController(text: product.unit);
+    final categoryController = TextEditingController(
+      text: product.canonicalCategory ?? '',
+    );
     final nutritionController = TextEditingController(
       text: product.nutritionalInfo ?? '',
     );
@@ -267,6 +272,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                   ),
                 ),
                 TextField(
+                  controller: categoryController,
+                  decoration: const InputDecoration(
+                    labelText: 'Categoria Canônica (ex: PADARIA > PAO)',
+                  ),
+                ),
+                TextField(
                   controller: nutritionController,
                   decoration: const InputDecoration(
                     labelText: 'Info Nutricional',
@@ -290,6 +301,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                   unit: unitController.text.trim(),
                   nutritionalInfo: nutritionController.text.trim(),
                   photoUrl: currentPhotoUrl,
+                  isVerified: product.isVerified,
+                  canonicalCategory: categoryController.text.trim().isEmpty
+                      ? null
+                      : categoryController.text.trim(),
                 );
 
                 StorageService.products.put(product.barcode, updatedProduct);
@@ -391,11 +406,14 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         debugPrint('Geofence: Local fora de área oficial. Preço será privado.');
       }
 
+      final isOperator = ref.read(authProvider).isOperator;
+
       final priceUpdate = PriceUpdate(
         barcode: _currentProduct!.barcode,
         locationId: locationId,
         price: price,
         timestamp: DateTime.now(),
+        verificationLevel: isOperator ? 2 : 0,
       );
 
       StorageService.prices.put(
@@ -410,7 +428,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           'payload': priceUpdate.toJson(),
         });
         debugPrint('Sync: Preço oficial sincronizado com o cluster');
+        ReputationService.markActivity();
       }
+
     }
 
     final cartItem = CartItem(
@@ -480,10 +500,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _barcodeController,
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              const ConfidenceThermometer(),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _barcodeController,
               decoration: InputDecoration(
                 labelText: 'Barcode',
                 prefixIcon: IconButton(
@@ -525,8 +548,24 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                         ? const Icon(Icons.shopping_bag)
                         : null,
                   ),
-                  title: Text(_currentProduct!.name),
-                  subtitle: Text('by ${_currentProduct!.manufacturer}'),
+                  title: Row(
+                    children: [
+                      Expanded(child: Text(_currentProduct!.name)),
+                      if (_currentProduct!.isVerified)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 4.0),
+                          child: Icon(Icons.verified, color: Colors.blue, size: 16),
+                        ),
+                      if (_currentProduct!.isLocal)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 4.0),
+                          child: Icon(Icons.home_work, color: Colors.orange, size: 16),
+                        ),
+                    ],
+                  ),
+                  subtitle: Text(
+                    '${_currentProduct!.manufacturer}${_currentProduct!.canonicalCategory != null ? ' • ${_currentProduct!.canonicalCategory}' : ''}',
+                  ),
                   trailing: ref.watch(authProvider).isOperator
                       ? IconButton(
                           icon: const Icon(Icons.edit),
@@ -546,14 +585,28 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                       builder: (context, box, child) {
                         // Sempre atualiza o controller se o produto atual mudar ou novo preço chegar
                         _updatePriceFromStorage(_currentProduct!.barcode);
+                        
+                        // Busca se o preço mais recente é oficial
+                        final latestPrice = box.values
+                            .where((p) => p.barcode == _currentProduct!.barcode)
+                            .toList()
+                          ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+                        final isOfficial = latestPrice.isNotEmpty && latestPrice.first.verificationLevel == 2;
+
                         return Row(
                           children: [
                             Expanded(
                               child: TextField(
                                 controller: _priceController,
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   labelText: 'Price',
                                   prefixText: 'R\$ ',
+                                  suffixIcon: isOfficial 
+                                    ? const Tooltip(
+                                        message: 'Preço Oficial Validado',
+                                        child: Icon(Icons.verified_user, color: Colors.blue, size: 20),
+                                      )
+                                    : null,
                                 ),
                                 keyboardType: TextInputType.number,
                               ),
@@ -598,7 +651,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 buttonLabel: 'Abrir câmera',
                 onButtonPressed: _openScanner,
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -1,0 +1,35 @@
+# docker-compose-hub.yml (Infraestrutura Central)
+version: '3.8'
+
+services:
+  hub:
+    build:
+      context: ./hub
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+    restart: always
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: always
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    restart: always
+
+volumes:
+  minio_data:
+  ollama_data:

@@ -11,6 +11,12 @@ const String msgError = 'error';
 const String msgProductRequest = 'product_request';
 const String msgSyncRequest = 'sync_request';
 const String msgSyncResponse = 'sync_response';
+const String msgReputationUpdate = 'reputation_update';
+
+/// Mensagens do Global Product Index (GPI)
+const String msgGpiLookup = 'gpi_lookup';
+const String msgGpiResponse = 'gpi_response';
+const String msgGpiPropose = 'gpi_propose';
 
 /// Novos tipos de mensagem para autenticação HMAC
 const String msgAuthChallenge = 'auth_challenge';
@@ -34,3 +40,7 @@ const String fieldMessage = 'message';
 const String fieldNonce = 'nonce';
 const String fieldSignature = 'signature';
 const String fieldLocationId = 'locationId';
+const String fieldBarcode = 'barcode';
+const String fieldContributorHash = 'contributorHash';
+const String fieldTrustScore = 'trustScore';
+const String fieldBonus = 'bonus';

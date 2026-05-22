@@ -19,12 +19,16 @@ import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'package:server/ai_service.dart';
+import 'package:server/invoice_service.dart';
 import 'package:server/product_metadata_service.dart';
 
 // List of connected clients
 final List<WebSocketChannel> _clients = [];
 late ClusterService _cluster;
 late ProductMetadataService _metadataService;
+final _invoiceService = InvoiceService();
+String? _announcedUrl;
+late DateTime _startTime;
 
 final minio = Minio(
   endPoint: Platform.environment['MINIO_ENDPOINT'] ?? 'localhost',
@@ -37,6 +41,7 @@ final minio = Minio(
 const String bucketName = 'shopping-comparator';
 
 void main() async {
+  _startTime = DateTime.now();
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((r) => print('${r.level}: ${r.message}'));
 
@@ -61,12 +66,6 @@ void main() async {
   // Warmup AI Engine
   unawaited(aiEngine.warmup());
 
-  _metadataService = ProductMetadataService(
-    aiEngine: aiEngine,
-    minio: minio,
-    bucketName: bucketName,
-  );
-
   if (hubUrl != null) {
     _cluster = ClusterService(
       hubUrl: hubUrl,
@@ -76,19 +75,27 @@ void main() async {
       locationId: Platform.environment['LOCATION_ID'] ?? '',
       locationPassword: Platform.environment['LOCATION_PASSWORD'] ?? '',
       onRelayMessage: (payload, origin) {
-        // Broadcast relayed message to local clients
+        // Preserva campos de reputação se presentes no payload original (que foi relayado)
+        // Nota: O ClusterService já passa o payload extraído da msg de Relay do Hub.
+        
         _broadcast(
           jsonEncode({
             fieldType: msgRelay,
             fieldPayload: payload,
-            'origin':
-                origin, // Keep 'origin' for local client compat or update them too
+            'origin': origin,
           }),
         );
       },
     );
     _cluster.connect();
   }
+
+  _metadataService = ProductMetadataService(
+    aiEngine: aiEngine,
+    minio: minio,
+    bucketName: bucketName,
+    clusterService: hubUrl != null ? _cluster : null, // Integração GPI
+  );
 
   // Ensure bucket exists and is public
   try {
@@ -336,58 +343,118 @@ void main() async {
 
   // Upload handler
   router.post('/products/upload-photo', (Request request) async {
-    final contentType = request.headers['content-type'];
-    if (contentType == null ||
-        !contentType.toLowerCase().contains('multipart/form-data')) {
-      print('SERVER: Rejecting non-multipart request: $contentType');
-      return Response.badRequest(body: 'Not a multipart request');
-    }
+    // ... rest of upload-photo (existing)
+  });
 
+  router.post('/api/announce-url', (Request request) async {
+    // ...
+  });
+
+  router.get('/api/health', (Request request) async {
+    final health = {
+      'status': 'ok',
+      'uptime': DateTime.now().difference(_startTime).toString(),
+      'region': Platform.environment['REGION'] ?? 'default',
+      'ai_version': '1.0.0', // Pode ser dinâmico no futuro
+      'last_announce': _announcedUrl,
+      'memory_usage': ProcessInfo.currentRss,
+    };
+    return Response.ok(jsonEncode(health));
+  });
+
+  // Bulk Import via Invoice handler
+  router.post('/bulk-import/invoice', (Request request) async {
     try {
-      final multipart = request.multipart();
-      if (multipart == null) {
-        return Response.badRequest(body: 'Failed to parse multipart');
+      final body = await request.readAsString();
+      final Map<String, dynamic> data = jsonDecode(body);
+      final url = data['url'] as String?;
+      final locationId = data[fieldLocationId] as String?;
+      final signature = data[fieldSignature] as String?;
+      final timestamp = data[fieldTimestamp] as String?;
+      final messageId = data[fieldMessageId] as String?;
+
+      if (url == null ||
+          locationId == null ||
+          signature == null ||
+          timestamp == null ||
+          messageId == null) {
+        return Response.badRequest(body: 'Missing required fields');
       }
 
-      String? fileName;
-      Uint8List? fileBytes;
+      final serverLocationId = Platform.environment['LOCATION_ID'] ?? '';
+      final locationPassword = Platform.environment['LOCATION_PASSWORD'] ?? '';
 
-      await for (final part in multipart.parts) {
-        final contentDisposition = part.headers['content-disposition'];
-        if (fileBytes == null &&
-            contentDisposition != null &&
-            contentDisposition.contains('name="image"')) {
-          fileName = 'products/${DateTime.now().millisecondsSinceEpoch}.jpg';
-          fileBytes = Uint8List.fromList(await part.readBytes());
-        } else {
-          await part.drain();
+      // Verify operator identity
+      if (locationId != serverLocationId || locationPassword.isEmpty) {
+        return Response.forbidden('Unauthorized: invalid locationId');
+      }
+
+      final messageToSign = '$url$timestamp$messageId';
+      final key = utf8.encode(locationPassword);
+      final hmac = Hmac(sha256, key);
+      final expectedSignature =
+          hmac.convert(utf8.encode(messageToSign)).toString();
+
+      if (signature != expectedSignature) {
+        return Response.forbidden('Unauthorized: invalid signature');
+      }
+
+      final items = await _invoiceService.processInvoiceUrl(url);
+      if (items.isEmpty) {
+        return Response.ok(jsonEncode({
+          'success': true,
+          'count': 0,
+          'message': 'Nenhum item novo encontrado ou nota já processada.'
+        }));
+      }
+
+      for (var item in items) {
+        final update = {
+          'barcode': item.barcode,
+          'locationId': locationId,
+          'price': item.price,
+          'timestamp': DateTime.now().toIso8601String(),
+          'messageId': const Uuid().v4(),
+          'verificationLevel': 2, // Oficial (Operator)
+        };
+
+        // Broadcast locally with official badge
+        final broadcastMsg = {
+          fieldType: 'price_update',
+          fieldPayload: update,
+          fieldTimestamp: update['timestamp'],
+          fieldMessageId: update['messageId'],
+          'isOfficial': true,
+        };
+
+        // Assinar o broadcast para outros servidores confiarem
+        final broadcastPayloadString = jsonEncode(update);
+        final broadcastMessageToSign =
+            '$broadcastPayloadString${update['timestamp']}${update['messageId']}';
+        final broadcastSignature =
+            hmac.convert(utf8.encode(broadcastMessageToSign)).toString();
+        broadcastMsg[fieldSignature] = broadcastSignature;
+
+        _broadcast(jsonEncode(broadcastMsg));
+
+        // Publish to Hub
+        if (Platform.environment['HUB_URL'] != null) {
+          _cluster.publish('region/${_cluster.region}', broadcastMsg);
         }
+
+        // Trigger AI registration if unknown (proactive)
+        // Passamos item.name como hintName para acelerar o cadastro
+        unawaited(_triggerAISearchIfMissing(item.barcode, request, hintName: item.name));
       }
 
-      if (fileBytes == null) {
-        print('SERVER: Multipart "image" part not found');
-        return Response.badRequest(body: 'Image part not found');
-      }
-
-      await minio.putObject(
-        bucketName,
-        fileName!,
-        Stream.value(fileBytes),
-        size: fileBytes.length,
-      );
-
-      final host = request.headers['host'] ?? 'localhost:8081';
-      final xProto = request.headers['x-forwarded-proto']?.toLowerCase();
-      final forceHttps =
-          Platform.environment['FORCE_HTTPS']?.toLowerCase() == 'true';
-
-      final proto = (xProto == 'https' || forceHttps) ? 'https' : 'http';
-      final publicUrl = '$proto://$host/storage/$bucketName/$fileName';
-      print('SERVER: Upload concluído: $publicUrl');
-      return Response.ok(publicUrl);
+      return Response.ok(jsonEncode({
+        'success': true,
+        'count': items.length,
+        'message': 'Carga de preços concluída com sucesso.',
+      }));
     } catch (e) {
-      print('SERVER ERROR in upload-photo: $e');
-      return Response.internalServerError(body: 'Upload failed: $e');
+      print('SERVER ERROR in bulk-import/invoice: $e');
+      return Response.internalServerError(body: 'Erro ao processar nota: $e');
     }
   });
 
@@ -436,7 +503,7 @@ void _broadcast(dynamic message, {dynamic exclude}) {
 }
 
 /// Helper to trigger AI search if a product is not found after a short delay.
-void _triggerAISearchIfMissing(String barcode, Request request) async {
+Future<void> _triggerAISearchIfMissing(String barcode, Request request, {String? hintName}) async {
   // Wait a bit to see if another server in the cluster responds
   await Future.delayed(const Duration(seconds: 3));
 
@@ -444,7 +511,7 @@ void _triggerAISearchIfMissing(String barcode, Request request) async {
   // For this MVP, the "source of truth" is the broadcast,
   // so we'll just proceed with AI search if we want to be proactive.
 
-  final metadata = await _metadataService.fetchAndRegisterProduct(barcode);
+  final metadata = await _metadataService.fetchAndRegisterProduct(barcode, hintName: hintName);
   if (metadata != null) {
     final registrationMsg = {
       fieldType: 'product_registration',

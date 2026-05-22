@@ -7,12 +7,16 @@ import 'package:google_fonts/google_fonts.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/storage_service.dart';
+import 'services/reputation_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Hive
   await StorageService.init();
+  
+  // Initialize Anonymous Reputation System
+  await ReputationService.init();
 
   runApp(const ProviderScope(child: ShoppingComparatorApp()));
 }

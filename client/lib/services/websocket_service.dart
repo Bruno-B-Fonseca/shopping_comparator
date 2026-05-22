@@ -5,18 +5,24 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'reputation_service.dart';
 
 const String msgAuthVerifyRequest = 'auth_verify_request';
 const String msgAuthVerifyResponse = 'auth_verify_response';
+const String msgReputationUpdate = 'reputation_update';
 const String fieldType = 'type';
 const String fieldPayload = 'payload';
 const String fieldSignature = 'signature';
 const String fieldNonce = 'nonce';
+const String fieldContributorHash = 'contributorHash';
+const String fieldBonus = 'bonus';
 
 enum WebSocketStatus { connected, disconnected, connecting }
 
 class WebSocketService {
   WebSocketChannel? _channel;
+  Function(int bonus)? onReputationUpdate;
+
   final StreamController<Map<String, dynamic>> _messageController =
       StreamController<Map<String, dynamic>>.broadcast();
   final StreamController<WebSocketStatus> _statusController =
@@ -27,6 +33,7 @@ class WebSocketService {
 
   WebSocketStatus _currentStatus = WebSocketStatus.disconnected;
   WebSocketStatus get currentStatus => _currentStatus;
+  String? get currentUrl => _lastUrl;
 
   int _reconnectAttempts = 0;
   Timer? _reconnectTimer;
@@ -137,6 +144,22 @@ class WebSocketService {
               return;
             }
             final Map<String, dynamic> message = jsonDecode(data.toString());
+            
+            // Tratamento especial para atualização de reputação pessoal
+            if (message[fieldType] == msgReputationUpdate) {
+              final targetHash = message[fieldContributorHash];
+              final bonus = message[fieldBonus] as int?;
+              if (targetHash == ReputationService.contributorHash && bonus != null) {
+                if (onReputationUpdate != null) {
+                  onReputationUpdate!(bonus);
+                } else {
+                  // Fallback para atualização direta se o callback não estiver setado
+                  ReputationService.updateMyScore(bonus);
+                }
+                debugPrint('Reputação: Bônus de $bonus recebido!');
+              }
+            }
+
             _messageController.add(message);
           } catch (e) {
             debugPrint('WebSocket: Erro ao decodificar mensagem: $e | Data: $data');
@@ -196,6 +219,9 @@ class WebSocketService {
     final channel = _channel;
     if (channel != null && _currentStatus == WebSocketStatus.connected) {
       try {
+        // Injeta o Hash de contribuidor anônimo para Web of Trust
+        message[fieldContributorHash] = ReputationService.contributorHash;
+        
         channel.sink.add(jsonEncode(message));
       } catch (e) {
         debugPrint('WebSocket: Erro ao enviar mensagem: $e');

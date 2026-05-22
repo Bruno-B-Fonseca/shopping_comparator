@@ -24,6 +24,12 @@ class Product extends HiveObject {
   @HiveField(5)
   final String? nutritionalInfo;
 
+  @HiveField(6)
+  final bool isVerified;
+
+  @HiveField(7)
+  final String? canonicalCategory;
+
   Product({
     required this.barcode,
     required this.name,
@@ -31,7 +37,12 @@ class Product extends HiveObject {
     required this.manufacturer,
     this.photoUrl,
     this.nutritionalInfo,
+    this.isVerified = false,
+    this.canonicalCategory,
   });
+
+  /// Verifica se o produto é local (artesanal/balança)
+  bool get isLocal => barcode.startsWith('local:') || barcode.startsWith('2');
 
   factory Product.fromJson(Map<String, dynamic> json) =>
       _$ProductFromJson(json);

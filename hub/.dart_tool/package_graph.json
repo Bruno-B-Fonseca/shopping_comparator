@@ -8,6 +8,8 @@
       "version": "1.0.0",
       "dependencies": [
         "crypto",
+        "google_generative_ai",
+        "http",
         "logging",
         "shelf",
         "shelf_web_socket",
@@ -54,6 +56,23 @@
       "name": "lints",
       "version": "3.0.0",
       "dependencies": []
+    },
+    {
+      "name": "http",
+      "version": "1.6.0",
+      "dependencies": [
+        "async",
+        "http_parser",
+        "meta",
+        "web"
+      ]
+    },
+    {
+      "name": "google_generative_ai",
+      "version": "0.4.7",
+      "dependencies": [
+        "http"
+      ]
     },
     {
       "name": "crypto",
@@ -323,13 +342,13 @@
       ]
     },
     {
-      "name": "fixnum",
-      "version": "1.1.1",
+      "name": "web",
+      "version": "0.5.1",
       "dependencies": []
     },
     {
-      "name": "web",
-      "version": "0.5.1",
+      "name": "meta",
+      "version": "1.18.2",
       "dependencies": []
     },
     {
@@ -341,6 +360,11 @@
         "string_scanner",
         "typed_data"
       ]
+    },
+    {
+      "name": "fixnum",
+      "version": "1.1.1",
+      "dependencies": []
     },
     {
       "name": "string_scanner",
@@ -369,11 +393,6 @@
         "source_maps",
         "stack_trace"
       ]
-    },
-    {
-      "name": "meta",
-      "version": "1.18.2",
-      "dependencies": []
     },
     {
       "name": "glob",

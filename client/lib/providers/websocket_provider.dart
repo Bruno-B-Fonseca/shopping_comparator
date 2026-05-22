@@ -1,10 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'consent_provider.dart';
+import 'reputation_provider.dart';
 import '../services/websocket_service.dart';
 
 final webSocketServiceProvider = Provider<WebSocketService>((ref) {
   final service = WebSocketService();
+  
+  service.onReputationUpdate = (bonus) {
+    ref.read(reputationProvider.notifier).updateScore(bonus);
+  };
+
   final consent = ref.watch(consentProvider);
 
   if (consent.privacyAcknowledged) {

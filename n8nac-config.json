@@ -1,0 +1,31 @@
+{
+  "version": 4,
+  "activeEnvironmentId": "local",
+  "environmentTargets": [
+    {
+      "id": "n8n-manager-shopping-comparator-0cdca7fc",
+      "name": "shopping-comparator",
+      "kind": "managed-instance",
+      "managedInstanceId": "n8n-manager-shopping-comparator-0cdca7fc"
+    }
+  ],
+  "environments": [
+    {
+      "id": "n8n-manager-shopping-comparator-0cdca7fc-2",
+      "name": "shopping-comparator",
+      "environmentTargetId": "n8n-manager-shopping-comparator-0cdca7fc",
+      "projectId": "personal",
+      "projectName": "Personal",
+      "syncFolder": "workflows"
+    },
+    {
+      "id": "local",
+      "name": "Local",
+      "environmentTargetId": "n8n-manager-shopping-comparator-0cdca7fc",
+      "projectId": "personal",
+      "projectName": "Personal",
+      "syncFolder": "workflows",
+      "folderSync": false
+    }
+  ]
+}

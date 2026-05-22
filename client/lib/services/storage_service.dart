@@ -5,6 +5,8 @@ import '../models/location_model.dart';
 import '../models/price_update.dart';
 import '../models/cart_item.dart';
 import '../models/chat_message.dart';
+import '../models/shopping_list.dart';
+import '../models/shopping_list_item.dart';
 import 'encryption_service.dart';
 
 class StorageService {
@@ -20,6 +22,8 @@ class StorageService {
     Hive.registerAdapter(PriceUpdateAdapter());
     Hive.registerAdapter(CartItemAdapter());
     Hive.registerAdapter(ChatMessageAdapter());
+    Hive.registerAdapter(ShoppingListItemAdapter());
+    Hive.registerAdapter(ShoppingListAdapter());
 
     // Open Boxes com criptografia
     await _openBoxSafe<Product>('products', encryptionKey);
@@ -27,6 +31,7 @@ class StorageService {
     await _openBoxSafe<PriceUpdate>('prices', encryptionKey);
     await _openBoxSafe<CartItem>('cart', encryptionKey);
     await _openBoxSafe<ChatMessage>('messages', encryptionKey);
+    await _openBoxSafe<ShoppingList>('shopping_lists', encryptionKey);
 
     // Box de tiles (Cache do mapa) - Sem criptografia por performance e serem dados públicos
     await Hive.openBox<Uint8List>('map_tiles');
@@ -57,4 +62,6 @@ class StorageService {
   static Box<PriceUpdate> get prices => Hive.box<PriceUpdate>('prices');
   static Box<CartItem> get cart => Hive.box<CartItem>('cart');
   static Box<ChatMessage> get messages => Hive.box<ChatMessage>('messages');
+  static Box<ShoppingList> get shoppingLists =>
+      Hive.box<ShoppingList>('shopping_lists');
 }
