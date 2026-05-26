@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.7.0] - 2026-05-25
+
+### Added
+- **Data Versioning & Stability**: 
+  - Implemented `updatedAt` timestamps for Products and Locations to track data freshness.
+  - New "Last-Write-Wins" (LWW) conflict resolution in `SyncService` ensures the most recent data always prevails across the network.
+  - Added "Verification Priority": Operator-verified data now has higher authority than unverified contributions.
+- **Modernized Product Metadata UI**:
+  - `CategoryTagInput`: Tag-based entry for Canonical Categories with comma separation and auto-uppercase.
+  - `NutritionalInfoInput`: Dedicated UI fields for Calories, Carbs, and Proteins, persisting as a unified formatted string.
+- **Product Metadata Correction**:
+  - Added "Forçar Re-cadastro" (Reset) button to purge incorrect metadata locally and on the Hub, triggering a fresh AI search.
+  - Implemented `gpi_delete` protocol on the Hub for global metadata purging.
+- **Data Quality Guardrails**:
+  - Official EAN-8/13 checksum validation added to scanner, manual entry, and backend AI services.
+  - Anti-pollution filters to automatically discard products with generic or invalid names (e.g., "Barcode Scanner").
+- **Sync Handshake Improvement**: Refactored `SyncService` to wait for active listeners before requesting initial data, eliminating race conditions that caused lost location data.
+
+## [1.6.0] - 2026-05-23
+
+### Added
+- **"Unbreakable" Standalone Mode**: 
+  - Implemented graceful degradation for Nginx and WebSocket server. The node now starts and operates local features (chat, prices, lists) even if the Hub, MinIO, or Ollama are unreachable.
+  - Automatic reconnection logic for the federated link (Hub) with 10s retry intervals.
+- **Lightweight Node Architecture**:
+  - Refactored `server/` code to make AI (Ollama) and Storage (MinIO) optional, aligning with the low-resource requirements for local establishments.
+- **Geo-Discovery & Self-Announcement**:
+  - New `/discover` API on the Hub for coordinate-based node lookup.
+  - New `/api/announce-url` route on the Node for dynamic tunnel mapping (Cloudflare/Ngrok).
+  - New `/api/health` dashboard for real-time monitoring of node status and uptime.
+- **Infrastructure Automation**:
+  - Simplified orchestration with `docker-compose-hub.yml` and `docker-compose-node.yml`.
+  - Added `Makefile` for one-command operations (`make hub-up`, `make node-up`).
+  - Added `README_ONBOARDING.md` for fast merchant integration.
+
 ## [1.5.0] - 2026-05-20
 
 ### Added

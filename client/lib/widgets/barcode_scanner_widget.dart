@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../utils/barcode_utils.dart';
 
 class BarcodeScannerWidget extends StatefulWidget {
   const BarcodeScannerWidget({super.key});
@@ -42,8 +43,14 @@ class _BarcodeScannerWidgetState extends State<BarcodeScannerWidget> {
           final List<Barcode> barcodes = capture.barcodes;
           for (final barcode in barcodes) {
             if (barcode.rawValue != null) {
+              final String code = BarcodeUtils.clean(barcode.rawValue!);
+              
+              if (!BarcodeUtils.isValidEan(code)) {
+                debugPrint('Scanner: Código inválido ignorado: $code');
+                continue;
+              }
+
               _isDetected = true;
-              final String code = barcode.rawValue!;
               // Return the code to the previous screen
               Navigator.pop(context, code);
               break;

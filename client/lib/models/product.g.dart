@@ -25,13 +25,14 @@ class ProductAdapter extends TypeAdapter<Product> {
       nutritionalInfo: fields[5] as String?,
       isVerified: fields[6] as bool,
       canonicalCategory: fields[7] as String?,
+      updatedAt: fields[8] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Product obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.barcode)
       ..writeByte(1)
@@ -47,7 +48,9 @@ class ProductAdapter extends TypeAdapter<Product> {
       ..writeByte(6)
       ..write(obj.isVerified)
       ..writeByte(7)
-      ..write(obj.canonicalCategory);
+      ..write(obj.canonicalCategory)
+      ..writeByte(8)
+      ..write(obj.updatedAt);
   }
 
   @override
@@ -74,6 +77,9 @@ Product _$ProductFromJson(Map<String, dynamic> json) => Product(
       nutritionalInfo: json['nutritionalInfo'] as String?,
       isVerified: json['isVerified'] as bool? ?? false,
       canonicalCategory: json['canonicalCategory'] as String?,
+      updatedAt: json['updatedAt'] == null
+          ? null
+          : DateTime.parse(json['updatedAt'] as String),
     );
 
 Map<String, dynamic> _$ProductToJson(Product instance) => <String, dynamic>{
@@ -85,4 +91,5 @@ Map<String, dynamic> _$ProductToJson(Product instance) => <String, dynamic>{
       'nutritionalInfo': instance.nutritionalInfo,
       'isVerified': instance.isVerified,
       'canonicalCategory': instance.canonicalCategory,
+      'updatedAt': instance.updatedAt?.toIso8601String(),
     };

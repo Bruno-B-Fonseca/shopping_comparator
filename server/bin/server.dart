@@ -30,14 +30,7 @@ final _invoiceService = InvoiceService();
 String? _announcedUrl;
 late DateTime _startTime;
 
-final minio = Minio(
-  endPoint: Platform.environment['MINIO_ENDPOINT'] ?? 'localhost',
-  port: int.tryParse(Platform.environment['MINIO_PORT'] ?? '9000') ?? 9000,
-  accessKey: Platform.environment['MINIO_ROOT_USER'] ?? 'admin',
-  secretKey: Platform.environment['MINIO_ROOT_PASSWORD'] ?? 'password',
-  useSSL: false,
-);
-
+Minio? _minio;
 const String bucketName = 'shopping-comparator';
 
 void main() async {
@@ -48,23 +41,44 @@ void main() async {
   final port = int.parse(Platform.environment['PORT'] ?? '3000');
   final hubUrl = Platform.environment['HUB_URL'];
 
-  // Setup AI Metadata Service
-  final aiProvider =
-      Platform.environment['AI_PROVIDER']?.toLowerCase() ?? 'ollama';
-  AIEngine aiEngine;
+  // Setup AI Metadata Service (Opcional no Nó Leve)
+  final aiProvider = Platform.environment['AI_PROVIDER']?.toLowerCase();
+  AIEngine? aiEngine;
+
   if (aiProvider == 'gemini') {
     aiEngine = GeminiEngine(
       apiKey: Platform.environment['GEMINI_API_KEY'] ?? '',
     );
-  } else {
-    // Default to internal docker service name
-    final ollamaUrl =
-        Platform.environment['OLLAMA_URL'] ?? 'http://ollama:11434';
+  } else if (aiProvider == 'ollama') {
+    final ollamaUrl = Platform.environment['OLLAMA_URL'];
     aiEngine = OllamaEngine(baseUrl: ollamaUrl);
   }
 
-  // Warmup AI Engine
-  unawaited(aiEngine.warmup());
+  // Warmup AI Engine se disponível
+  if (aiEngine != null) {
+    unawaited(aiEngine.warmup());
+  }
+
+  // Setup MinIO (Opcional no Nó Leve)
+  if (Platform.environment['MINIO_ENDPOINT'] != null) {
+    _minio = Minio(
+      endPoint: Platform.environment['MINIO_ENDPOINT']!,
+      port: int.tryParse(Platform.environment['MINIO_PORT'] ?? '9000') ?? 9000,
+      accessKey: Platform.environment['MINIO_ROOT_USER'] ?? 'admin',
+      secretKey: Platform.environment['MINIO_ROOT_PASSWORD'] ?? 'password',
+      useSSL: false,
+    );
+
+    // Ensure bucket exists
+    try {
+      if (!await _minio!.bucketExists(bucketName)) {
+        await _minio!.makeBucket(bucketName);
+        print('Bucket $bucketName created');
+      }
+    } catch (e) {
+      print('MinIO: Error checking/creating bucket: $e');
+    }
+  }
 
   if (hubUrl != null) {
     _cluster = ClusterService(
@@ -74,10 +88,12 @@ void main() async {
           Platform.environment['PUBLIC_WS_URL'] ?? 'ws://localhost:$port',
       locationId: Platform.environment['LOCATION_ID'] ?? '',
       locationPassword: Platform.environment['LOCATION_PASSWORD'] ?? '',
+      lat: double.tryParse(Platform.environment['LAT'] ?? ''),
+      lng: double.tryParse(Platform.environment['LNG'] ?? ''),
       onRelayMessage: (payload, origin) {
         // Preserva campos de reputação se presentes no payload original (que foi relayado)
         // Nota: O ClusterService já passa o payload extraído da msg de Relay do Hub.
-        
+
         _broadcast(
           jsonEncode({
             fieldType: msgRelay,
@@ -92,48 +108,45 @@ void main() async {
 
   _metadataService = ProductMetadataService(
     aiEngine: aiEngine,
-    minio: minio,
+    minio: _minio,
     bucketName: bucketName,
     clusterService: hubUrl != null ? _cluster : null, // Integração GPI
   );
 
-  // Ensure bucket exists and is public
-  try {
-    if (!await minio.bucketExists(bucketName)) {
-      await minio.makeBucket(bucketName);
-      print('Bucket $bucketName created');
+  // Ensure bucket is public if minio is available
+  if (_minio != null) {
+    try {
+      final policy = {
+        'Version': '2012-10-17',
+        'Statement': [
+          {
+            'Action': ['s3:GetBucketLocation', 's3:ListBucket'],
+            'Effect': 'Allow',
+            'Principal': {
+              'AWS': ['*'],
+            },
+            'Resource': ['arn:aws:s3:::$bucketName'],
+          },
+          {
+            'Action': ['s3:GetObject'],
+            'Effect': 'Allow',
+            'Principal': {
+              'AWS': ['*'],
+            },
+            'Resource': ['arn:aws:s3:::$bucketName/*'],
+          },
+        ],
+      };
+      await _minio!.setBucketPolicy(bucketName, policy);
+      print('Bucket $bucketName policy set to public');
+    } catch (e) {
+      print('Warning: Could not set bucket policy: $e');
     }
-
-    // Set public policy for the bucket
-    final policy = {
-      'Version': '2012-10-17',
-      'Statement': [
-        {
-          'Action': ['s3:GetBucketLocation', 's3:ListBucket'],
-          'Effect': 'Allow',
-          'Principal': {
-            'AWS': ['*'],
-          },
-          'Resource': ['arn:aws:s3:::$bucketName'],
-        },
-        {
-          'Action': ['s3:GetObject'],
-          'Effect': 'Allow',
-          'Principal': {
-            'AWS': ['*'],
-          },
-          'Resource': ['arn:aws:s3:::$bucketName/*'],
-        },
-      ],
-    };
-    await minio.setBucketPolicy(bucketName, policy);
-    print('Bucket $bucketName policy set to public');
-  } catch (e) {
-    print('Warning: Could not verify/create/config bucket: $e');
   }
 
   final router = Router();
   final priceProcessor = PriceProcessor(aiEngine: aiEngine);
+
 
   // Proxy for external images (fixes CORS on Web)
   router.get('/proxy', (Request request) async {
@@ -197,14 +210,22 @@ void main() async {
               if (signature != null && nonce != null) {
                 final key = utf8.encode(locationPassword);
                 final hmac = Hmac(sha256, key);
-                final expectedSignature = hmac.convert(utf8.encode(nonce)).toString();
+                final expectedSignature = hmac
+                    .convert(utf8.encode(nonce))
+                    .toString();
 
-                final success = signature == expectedSignature && locationPassword.isNotEmpty;
-                webSocket.sink.add(jsonEncode({
-                  fieldType: msgAuthVerifyResponse,
-                  fieldPayload: {'success': success},
-                }));
-                print('SERVER: Verificação de credenciais: ${success ? 'SUCESSO' : 'FALHA'}');
+                final success =
+                    signature == expectedSignature &&
+                    locationPassword.isNotEmpty;
+                webSocket.sink.add(
+                  jsonEncode({
+                    fieldType: msgAuthVerifyResponse,
+                    fieldPayload: {'success': success},
+                  }),
+                );
+                print(
+                  'SERVER: Verificação de credenciais: ${success ? 'SUCESSO' : 'FALHA'}',
+                );
               }
               return;
             }
@@ -213,9 +234,22 @@ void main() async {
             if (type == 'product_request') {
               final payload = msg[fieldPayload];
               final barcode = payload['barcode'] as String?;
+              final force = payload['force'] == true;
               if (barcode != null) {
-                _triggerAISearchIfMissing(barcode, request);
+                _triggerAISearchIfMissing(barcode, request, force: force);
               }
+            }
+
+            // Handle Sync Request
+            if (type == msgSyncRequest) {
+              print(
+                'SERVER: Propagando sync_request para todos os clientes...',
+              );
+              _broadcast(message, exclude: webSocket);
+              if (hubUrl != null) {
+                _cluster.publish('region/${_cluster.region}', msg);
+              }
+              return;
             }
 
             // Lógica de autenticação para tipos críticos
@@ -224,7 +258,7 @@ void main() async {
               'promotion',
               'product_registration',
               'location_registration',
-              'price_update'
+              'price_update',
             ];
 
             if (criticalTypes.contains(type)) {
@@ -232,13 +266,18 @@ void main() async {
               final timestamp = msg[fieldTimestamp] as String?;
               final messageId = msg[fieldMessageId] as String?;
 
-              if (signature != null && timestamp != null && messageId != null && locationPassword.isNotEmpty) {
+              if (signature != null &&
+                  timestamp != null &&
+                  messageId != null &&
+                  locationPassword.isNotEmpty) {
                 // Validar assinatura HMAC
                 final payloadString = jsonEncode(msg[fieldPayload]);
                 final key = utf8.encode(locationPassword);
                 final messageToSign = '$payloadString$timestamp$messageId';
                 final hmac = Hmac(sha256, key);
-                final expectedSignature = hmac.convert(utf8.encode(messageToSign)).toString();
+                final expectedSignature = hmac
+                    .convert(utf8.encode(messageToSign))
+                    .toString();
 
                 if (signature == expectedSignature) {
                   msg['isOfficial'] = true;
@@ -246,7 +285,9 @@ void main() async {
                     msg[fieldPayload]['isOfficial'] = true;
                   }
                 } else {
-                  print('SERVER: Assinatura inválida para $type (SPOOFING ATTEMPTED)');
+                  print(
+                    'SERVER: Assinatura inválida para $type (SPOOFING ATTEMPTED)',
+                  );
                   msg['isOfficial'] = false;
                   // Se for promoção, descarta
                   if (type == 'promotion') return;
@@ -343,11 +384,89 @@ void main() async {
 
   // Upload handler
   router.post('/products/upload-photo', (Request request) async {
-    // ... rest of upload-photo (existing)
+    if (_minio == null) {
+      return Response.badRequest(body: 'Storage local (MinIO) não disponível neste nó leve.');
+    }
+
+    final contentType = request.headers['content-type'];
+    if (contentType == null ||
+        !contentType.toLowerCase().contains('multipart/form-data')) {
+      print('SERVER: Rejecting non-multipart request: $contentType');
+      return Response.badRequest(body: 'Not a multipart request');
+    }
+
+    try {
+      final multipart = request.multipart();
+      if (multipart == null) {
+        return Response.badRequest(body: 'Failed to parse multipart');
+      }
+
+      String? fileName;
+      Uint8List? fileBytes;
+
+      await for (final part in multipart.parts) {
+        final contentDisposition = part.headers['content-disposition'];
+        if (fileBytes == null &&
+            contentDisposition != null &&
+            contentDisposition.contains('name="image"')) {
+          fileName = 'products/${DateTime.now().millisecondsSinceEpoch}.jpg';
+          fileBytes = Uint8List.fromList(await part.readBytes());
+        } else {
+          await part.drain();
+        }
+      }
+
+      if (fileBytes == null) {
+        print('SERVER: Multipart "image" part not found');
+        return Response.badRequest(body: 'Image part not found');
+      }
+
+      await _minio!.putObject(
+        bucketName,
+        fileName!,
+        Stream.value(fileBytes),
+        size: fileBytes.length,
+      );
+
+      final host = request.headers['host'];
+      final xProto = request.headers['x-forwarded-proto']?.toLowerCase();
+      final forceHttps = Platform.environment['FORCE_HTTPS']?.toLowerCase() == 'true';
+
+      // Se estamos atrás de um proxy (Cloudflare/Nginx), usamos o host do request.
+      // Se não, fallback para localhost (dev).
+      final proto = (xProto == 'https' || forceHttps) ? 'https' : 'http';
+      final baseUrl = host != null ? '$proto://$host' : '';
+      
+      final publicUrl = '$baseUrl/storage/$bucketName/$fileName';
+      print('SERVER: Upload concluído: $publicUrl');
+      return Response.ok(publicUrl);
+    } catch (e) {
+      print('SERVER ERROR in upload-photo: $e');
+      return Response.internalServerError(body: 'Upload failed: $e');
+    }
   });
 
   router.post('/api/announce-url', (Request request) async {
-    // ...
+    final body = await request.readAsString();
+    try {
+      final Map<String, dynamic> data = jsonDecode(body);
+      final url = data['url'] as String?;
+      if (url != null) {
+        _announcedUrl = url;
+        print('SERVER: URL anunciada com sucesso: $url');
+
+        // IMPORTANTE: Avisar o Hub sobre a nova URL de túnel
+        if (Platform.environment['HUB_URL'] != null) {
+          _cluster.updateRegistration(wsUrl: url);
+          print('SERVER: Hub notificado sobre a nova URL pública.');
+        }
+
+        return Response.ok(jsonEncode({'status': 'success', 'url': url}));
+      }
+      return Response.badRequest(body: 'Missing "url" in JSON body');
+    } catch (e) {
+      return Response.badRequest(body: 'Invalid JSON');
+    }
   });
 
   router.get('/api/health', (Request request) async {
@@ -392,8 +511,9 @@ void main() async {
       final messageToSign = '$url$timestamp$messageId';
       final key = utf8.encode(locationPassword);
       final hmac = Hmac(sha256, key);
-      final expectedSignature =
-          hmac.convert(utf8.encode(messageToSign)).toString();
+      final expectedSignature = hmac
+          .convert(utf8.encode(messageToSign))
+          .toString();
 
       if (signature != expectedSignature) {
         return Response.forbidden('Unauthorized: invalid signature');
@@ -401,11 +521,13 @@ void main() async {
 
       final items = await _invoiceService.processInvoiceUrl(url);
       if (items.isEmpty) {
-        return Response.ok(jsonEncode({
-          'success': true,
-          'count': 0,
-          'message': 'Nenhum item novo encontrado ou nota já processada.'
-        }));
+        return Response.ok(
+          jsonEncode({
+            'success': true,
+            'count': 0,
+            'message': 'Nenhum item novo encontrado ou nota já processada.',
+          }),
+        );
       }
 
       for (var item in items) {
@@ -431,8 +553,9 @@ void main() async {
         final broadcastPayloadString = jsonEncode(update);
         final broadcastMessageToSign =
             '$broadcastPayloadString${update['timestamp']}${update['messageId']}';
-        final broadcastSignature =
-            hmac.convert(utf8.encode(broadcastMessageToSign)).toString();
+        final broadcastSignature = hmac
+            .convert(utf8.encode(broadcastMessageToSign))
+            .toString();
         broadcastMsg[fieldSignature] = broadcastSignature;
 
         _broadcast(jsonEncode(broadcastMsg));
@@ -444,17 +567,125 @@ void main() async {
 
         // Trigger AI registration if unknown (proactive)
         // Passamos item.name como hintName para acelerar o cadastro
-        unawaited(_triggerAISearchIfMissing(item.barcode, request, hintName: item.name));
+        unawaited(
+          _triggerAISearchIfMissing(item.barcode, request, hintName: item.name),
+        );
       }
 
-      return Response.ok(jsonEncode({
-        'success': true,
-        'count': items.length,
-        'message': 'Carga de preços concluída com sucesso.',
-      }));
+      return Response.ok(
+        jsonEncode({
+          'success': true,
+          'count': items.length,
+          'message': 'Carga de preços concluída com sucesso.',
+        }),
+      );
     } catch (e) {
       print('SERVER ERROR in bulk-import/invoice: $e');
       return Response.internalServerError(body: 'Erro ao processar nota: $e');
+    }
+  });
+
+  // Bulk Import via XML (NF-e/NFC-e)
+  router.post('/bulk-import/xml', (Request request) async {
+    try {
+      final body = await request.readAsString();
+      final Map<String, dynamic> data = jsonDecode(body);
+      final xml = data['xml'] as String?;
+      final locationId = data[fieldLocationId] as String?;
+      final signature = data[fieldSignature] as String?;
+      final timestamp = data[fieldTimestamp] as String?;
+      final messageId = data[fieldMessageId] as String?;
+
+      if (xml == null ||
+          locationId == null ||
+          signature == null ||
+          timestamp == null ||
+          messageId == null) {
+        return Response.badRequest(body: 'Missing required fields');
+      }
+
+      final serverLocationId = Platform.environment['LOCATION_ID'] ?? '';
+      final locationPassword = Platform.environment['LOCATION_PASSWORD'] ?? '';
+
+      // Verify operator identity
+      if (locationId != serverLocationId || locationPassword.isEmpty) {
+        return Response.forbidden('Unauthorized: invalid locationId');
+      }
+
+      // Validar assinatura: xml + timestamp + messageId
+      final messageToSign = '$xml$timestamp$messageId';
+      final key = utf8.encode(locationPassword);
+      final hmac = Hmac(sha256, key);
+      final expectedSignature = hmac
+          .convert(utf8.encode(messageToSign))
+          .toString();
+
+      if (signature != expectedSignature) {
+        return Response.forbidden('Unauthorized: invalid signature');
+      }
+
+      final items = _invoiceService.processInvoiceXml(xml);
+      if (items.isEmpty) {
+        return Response.ok(
+          jsonEncode({
+            'success': true,
+            'count': 0,
+            'message': 'Nenhum item válido encontrado no XML.',
+          }),
+        );
+      }
+
+      for (var item in items) {
+        final update = {
+          'barcode': item.barcode,
+          'locationId': locationId,
+          'price': item.price,
+          'timestamp': DateTime.now().toIso8601String(),
+          'messageId': const Uuid().v4(),
+          'verificationLevel': 2, // Oficial (Operator)
+        };
+
+        // Broadcast locally with official badge
+        final broadcastMsg = {
+          fieldType: 'price_update',
+          fieldPayload: update,
+          fieldTimestamp: update['timestamp'],
+          fieldMessageId: update['messageId'],
+          'isOfficial': true,
+        };
+
+        // Assinar o broadcast para outros servidores confiarem
+        final broadcastPayloadString = jsonEncode(update);
+        final broadcastMessageToSign =
+            '$broadcastPayloadString${update['timestamp']}${update['messageId']}';
+        final broadcastSignature = hmac
+            .convert(utf8.encode(broadcastMessageToSign))
+            .toString();
+        broadcastMsg[fieldSignature] = broadcastSignature;
+
+        _broadcast(jsonEncode(broadcastMsg));
+
+        // Publish to Hub
+        if (Platform.environment['HUB_URL'] != null) {
+          _cluster.publish('region/${_cluster.region}', broadcastMsg);
+        }
+
+        // Trigger AI registration if unknown (proactive)
+        unawaited(
+          _triggerAISearchIfMissing(item.barcode, request, hintName: item.name),
+        );
+      }
+
+      return Response.ok(
+        jsonEncode({
+          'success': true,
+          'count': items.length,
+          'message': 'Carga de preços via XML concluída com sucesso (${items.length} itens).',
+        }),
+      );
+    } catch (e) {
+      print('SERVER ERROR in bulk-import/xml: $e');
+      return Response.internalServerError(body: 'Erro ao processar arquivo XML: $e');
     }
   });
 
@@ -503,15 +734,24 @@ void _broadcast(dynamic message, {dynamic exclude}) {
 }
 
 /// Helper to trigger AI search if a product is not found after a short delay.
-Future<void> _triggerAISearchIfMissing(String barcode, Request request, {String? hintName}) async {
-  // Wait a bit to see if another server in the cluster responds
-  await Future.delayed(const Duration(seconds: 3));
+Future<void> _triggerAISearchIfMissing(
+  String barcode,
+  Request request, {
+  String? hintName,
+  bool force = false,
+}) async {
+  // Se não for forçado, espera um pouco para ver se outro servidor responde
+  if (!force) {
+    await Future.delayed(const Duration(seconds: 3));
+  } else {
+    print('AI: Forçando re-cadastro para o barcode $barcode');
+  }
 
-  // In a real scenario, we'd check a local cache/DB here.
-  // For this MVP, the "source of truth" is the broadcast,
-  // so we'll just proceed with AI search if we want to be proactive.
-
-  final metadata = await _metadataService.fetchAndRegisterProduct(barcode, hintName: hintName);
+  final metadata = await _metadataService.fetchAndRegisterProduct(
+    barcode,
+    hintName: hintName,
+    force: force,
+  );
   if (metadata != null) {
     final registrationMsg = {
       fieldType: 'product_registration',

@@ -4,9 +4,11 @@ import 'package:intl/intl.dart';
 
 import '../providers/cart_provider.dart';
 import '../providers/navigation_provider.dart';
+import '../providers/shopping_list_provider.dart';
 import '../services/storage_service.dart';
 import '../services/image_service.dart';
 import '../widgets/empty_state_widget.dart';
+import '../models/cart_item.dart';
 
 class CartScreen extends ConsumerWidget {
   const CartScreen({super.key});
@@ -27,9 +29,16 @@ class CartScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Shopping Cart'),
         actions: [
+          if (cartItems.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.save_as),
+              onPressed: () => _showSaveAsListDialog(context, ref, cartItems),
+              tooltip: 'Salvar como Lista',
+            ),
           IconButton(
             icon: const Icon(Icons.delete_sweep),
             onPressed: () => ref.read(cartProvider.notifier).clear(),
+            tooltip: 'Limpar Carrinho',
           ),
         ],
       ),
@@ -137,6 +146,51 @@ class CartScreen extends ConsumerWidget {
                     },
                   ),
                 ),
+        ],
+      ),
+    );
+  }
+
+  void _showSaveAsListDialog(
+    BuildContext context,
+    WidgetRef ref,
+    List<CartItem> items,
+  ) {
+    final nameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Salvar como Lista'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'Nome da Lista',
+            hintText: 'Ex: Compras do Mês',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              if (name.isNotEmpty) {
+                await ref
+                    .read(shoppingListProvider.notifier)
+                    .createListFromCart(name, items);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Lista "$name" criada com sucesso!')),
+                  );
+                }
+              }
+            },
+            child: const Text('Salvar'),
+          ),
         ],
       ),
     );

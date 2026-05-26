@@ -9,12 +9,30 @@ services:
       - "3001:3001"
     environment:
       - PORT=3001
+    volumes:
+      - ./hub/config:/config
     restart: always
+
+  # Túnel estável para o Hub (Ponto de encontro nacional)
+  hub-tunnel:
+    image: ngrok/ngrok:latest
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: http hub:3001 --url=https://${NGROK_DOMAIN}
+    restart: always
+    depends_on:
+      - hub
 
   ollama:
     image: ollama/ollama:latest
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
-      - ollama_data:/root/.ollama
+      - shopping_comparator_ollama_data:/root/.ollama
     restart: always
 
   minio:
@@ -32,4 +50,5 @@ services:
 
 volumes:
   minio_data:
-  ollama_data:
+  shopping_comparator_ollama_data:
+    external: true

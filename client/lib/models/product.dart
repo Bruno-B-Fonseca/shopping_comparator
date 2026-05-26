@@ -30,6 +30,9 @@ class Product extends HiveObject {
   @HiveField(7)
   final String? canonicalCategory;
 
+  @HiveField(8)
+  final DateTime? updatedAt;
+
   Product({
     required this.barcode,
     required this.name,
@@ -39,6 +42,7 @@ class Product extends HiveObject {
     this.nutritionalInfo,
     this.isVerified = false,
     this.canonicalCategory,
+    this.updatedAt,
   });
 
   /// Verifica se o produto é local (artesanal/balança)

@@ -45,21 +45,51 @@ class ShoppingOptimizerService {
     final Map<String, List<PriceUpdate>> itemPrices = {};
     final List<ShoppingListItem> missingItems = [];
     
+    // Cache de códigos de barra por categoria/nome para evitar buscas repetitivas
+    final allProducts = StorageService.products.values.toList();
+
     for (var item in list.items) {
       if (item.isChecked) continue;
 
-      // Busca preços para este item (por barcode ou nome/categoria futuramente)
-      // Por enquanto, focamos em barcode para precisão
-      final prices = StorageService.prices.values.where((p) {
-        final matchesItem = (item.barcode != null && p.barcode == item.barcode) || 
-                           (p.barcode == item.barcode); // TODO: Melhorar matching semântico
-        return matchesItem && nearbyLocationIds.contains(p.locationId);
-      }).toList();
+      List<PriceUpdate> foundPrices = [];
 
-      if (prices.isEmpty) {
+      // PRIORIDADE 1: Busca por Código de Barras Exato
+      if (item.barcode != null) {
+        foundPrices = StorageService.prices.values.where((p) {
+          return p.barcode == item.barcode && nearbyLocationIds.contains(p.locationId);
+        }).toList();
+      }
+
+      // PRIORIDADE 2: Busca por Categoria Canônica (se não achou por barcode)
+      if (foundPrices.isEmpty && item.category != null) {
+        final productsInCategory = allProducts
+            .where((p) => p.canonicalCategory == item.category)
+            .map((p) => p.barcode)
+            .toSet();
+        
+        foundPrices = StorageService.prices.values.where((p) {
+          return productsInCategory.contains(p.barcode) && nearbyLocationIds.contains(p.locationId);
+        }).toList();
+      }
+
+      // PRIORIDADE 3: Busca por Nome (Substring) - Caso o usuário digitou apenas texto
+      if (foundPrices.isEmpty) {
+        final query = item.name.toLowerCase();
+        final productsByName = allProducts
+            .where((p) => p.name.toLowerCase().contains(query))
+            .map((p) => p.barcode)
+            .toSet();
+        
+        foundPrices = StorageService.prices.values.where((p) {
+          return (productsByName.contains(p.barcode) || p.barcode.contains(query)) && 
+                 nearbyLocationIds.contains(p.locationId);
+        }).toList();
+      }
+
+      if (foundPrices.isEmpty) {
         missingItems.add(item);
       } else {
-        itemPrices[item.id] = prices..sort((a, b) => a.price.compareTo(b.price));
+        itemPrices[item.id] = foundPrices..sort((a, b) => a.price.compareTo(b.price));
       }
     }
 

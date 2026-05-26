@@ -26,8 +26,10 @@ class SyncService {
     // Cancela assinatura anterior se houver
     _subscription?.cancel();
 
+    final ws = ref.read(webSocketServiceProvider);
+
     // Escuta o stream de mensagens diretamente
-    _subscription = ref.read(webSocketServiceProvider).messages.listen((data) {
+    _subscription = ws.messages.listen((data) {
       try {
         final consent = ref.read(consentProvider);
         if (!consent.privacyAcknowledged) {
@@ -88,13 +90,59 @@ class SyncService {
         debugPrint('SyncService: Erro ao processar sincronização: $e');
       }
     }, onError: (e) => debugPrint('SyncService: Erro no stream: $e'));
+
+    // SOLICITA SINCRONIZAÇÃO APÓS INICIAR O LISTENER
+    // Fazemos um pequeno delay para garantir que o stream está "quente"
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (ws.currentStatus == WebSocketStatus.connected) {
+        debugPrint('SyncService: Solicitando sincronização inicial...');
+        ws.sendMessage({'type': 'sync_request'});
+      }
+    });
+
+    // Também escuta mudanças de status para pedir sync ao reconectar
+    ws.status.listen((status) {
+      if (status == WebSocketStatus.connected) {
+        debugPrint('SyncService: Reconexão detectada, pedindo novo sync...');
+        ws.sendMessage({'type': 'sync_request'});
+      }
+    });
   }
 
   void _handleProductSync(Map<String, dynamic> payload) {
     try {
-      final product = Product.fromJson(payload);
-      StorageService.products.put(product.barcode, product);
-      debugPrint('SyncService: Produto sincronizado -> ${product.name}');
+      final incoming = Product.fromJson(payload);
+      
+      // DESCARTA PRODUTOS INVÁLIDOS
+      if (incoming.name.toLowerCase().contains('barcode scanner')) {
+        debugPrint('SyncService: Descartando produto inválido -> ${incoming.barcode}');
+        return;
+      }
+
+      final local = StorageService.products.get(incoming.barcode);
+      if (local != null) {
+        // RESOLUÇÃO DE CONFLITO
+        final incomingDate = incoming.updatedAt ?? DateTime(2000);
+        final localDate = local.updatedAt ?? DateTime(2000);
+
+        // Prioridade: 1. Verificado vence não verificado. 2. Mais novo vence mais velho.
+        bool incomingIsBetter = false;
+        if (incoming.isVerified && !local.isVerified) {
+          incomingIsBetter = true;
+        } else if (incoming.isVerified == local.isVerified) {
+          if (incomingDate.isAfter(localDate)) {
+            incomingIsBetter = true;
+          }
+        }
+
+        if (!incomingIsBetter) {
+          debugPrint('SyncService: Ignorando produto antigo/não-verificado -> ${incoming.barcode}');
+          return;
+        }
+      }
+
+      StorageService.products.put(incoming.barcode, incoming);
+      debugPrint('SyncService: Produto sincronizado (LWW) -> ${incoming.name}');
     } catch (e) {
       debugPrint('SyncService: Erro ao sincronizar produto: $e');
     }
@@ -102,9 +150,21 @@ class SyncService {
 
   void _handleLocationSync(Map<String, dynamic> payload) {
     try {
-      final loc = LocationModel.fromJson(payload);
-      StorageService.locations.put(loc.id, loc);
-      debugPrint('SyncService: Localização sincronizada -> ${loc.name}');
+      final incoming = LocationModel.fromJson(payload);
+      
+      final local = StorageService.locations.get(incoming.id);
+      if (local != null) {
+        final incomingDate = incoming.updatedAt ?? DateTime(2000);
+        final localDate = local.updatedAt ?? DateTime(2000);
+
+        if (incomingDate.isBefore(localDate) || incomingDate.isAtSameMomentAs(localDate)) {
+          debugPrint('SyncService: Ignorando local antigo -> ${incoming.name}');
+          return;
+        }
+      }
+
+      StorageService.locations.put(incoming.id, incoming);
+      debugPrint('SyncService: Localização sincronizada (LWW) -> ${incoming.name}');
     } catch (e) {
       debugPrint('SyncService: Erro ao sincronizar localização: $e');
     }

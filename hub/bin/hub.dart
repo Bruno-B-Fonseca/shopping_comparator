@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as ioshelf;
 import 'package:shelf_web_socket/shelf_web_socket.dart';
+import 'package:shelf_router/shelf_router.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:logging/logging.dart';
 import 'package:uuid/uuid.dart';
@@ -23,8 +25,10 @@ class ServerInfo {
   final String wsUrl;
   DateTime lastHeartbeat;
   bool isAuthenticated;
+  double? lat;
+  double? lng;
 
-  ServerInfo(this.id, this.locationId, this.region, this.wsUrl, this.lastHeartbeat, {this.isAuthenticated = false});
+  ServerInfo(this.id, this.locationId, this.region, this.wsUrl, this.lastHeartbeat, {this.isAuthenticated = false, this.lat, this.lng});
 
   Map<String, dynamic> toJson() => {
         fieldServerId: id,
@@ -32,8 +36,11 @@ class ServerInfo {
         fieldRegion: region,
         fieldWsUrl: wsUrl,
         'lastHeartbeat': lastHeartbeat.toIso8601String(),
+        'lat': lat,
+        'lng': lng,
       };
 }
+
 
 final topics = <String, Set<WebSocketChannel>>{};
 final servers = <String, ServerInfo>{};
@@ -64,7 +71,7 @@ void main() async {
   });
 
   final port = int.parse(Platform.environment['PORT'] ?? '3001');
-  
+
   // Inicia conexão com Hub superior, se configurado
   final upstreamUrl = Platform.environment['UPSTREAM_HUB_URL'];
   if (upstreamUrl != null && upstreamUrl.isNotEmpty) {
@@ -81,9 +88,11 @@ void main() async {
 }
 
 Future<HttpServer> serveHub(InternetAddress address, int port) async {
-  final handler = webSocketHandler((webSocket, subprotocol) {
-    _log.info('New connection to Hub');
+  final router = Router();
 
+  // WebSocket Handler
+  router.get('/ws', webSocketHandler((webSocket, subprotocol) {
+    _log.info('New connection to Hub');
     webSocket.stream.listen(
       (message) {
         try {
@@ -93,28 +102,73 @@ Future<HttpServer> serveHub(InternetAddress address, int port) async {
           _log.severe('Error handling message: $e');
         }
       },
-      onDone: () {
-        _log.info('Connection closed');
-        _unregister(webSocket);
-      },
-      onError: (e) {
-        _log.severe('Error: $e');
-        _unregister(webSocket);
-      },
+      onDone: () => _unregister(webSocket),
+      onError: (e) => _unregister(webSocket),
     );
+  }));
+
+  // REST: Discovery Endpoint
+  router.get('/discover', (Request request) {
+    final latStr = request.url.queryParameters['lat'];
+    final lngStr = request.url.queryParameters['lng'];
+
+    if (latStr == null || lngStr == null) {
+      return Response.badRequest(body: 'Missing lat or lng parameters');
+    }
+
+    final userLat = double.tryParse(latStr);
+    final userLng = double.tryParse(lngStr);
+
+    if (userLat == null || userLng == null) {
+      return Response.badRequest(body: 'Invalid lat or lng format');
+    }
+
+    // Filtra servidores num raio de 50km (Configurável)
+    final nearby = servers.values.where((s) {
+      if (s.lat == null || s.lng == null || !s.isAuthenticated) return false;
+      final dist = _calculateDistance(userLat, userLng, s.lat!, s.lng!);
+      return dist <= 50.0;
+    }).map((s) => {
+      'locationId': s.locationId,
+      'wsUrl': s.wsUrl,
+      'lat': s.lat,
+      'lng': s.lng,
+      'region': s.region,
+    }).toList();
+
+    return Response.ok(jsonEncode({
+      'timestamp': DateTime.now().toIso8601String(),
+      'results': nearby,
+    }));
   });
+
+  // Root fallback (redirect to WS or simple info)
+  router.get('/', (Request request) => Response.ok('ShopComp Hub Active'));
+
+  final handler = const Pipeline()
+      .addMiddleware(logRequests())
+      .addHandler(router.call);
 
   // Start heartbeat timers
   Timer.periodic(const Duration(seconds: 10), (_) => _sendPings());
   Timer.periodic(const Duration(seconds: 5), (_) => _checkTimeouts());
-  
-  // Lógica de resfriamento (Decay) a cada 24 horas (ou 1 min para teste em dev)
+
+  // Lógica de resfriamento (Decay) a cada 24 horas
   Timer.periodic(const Duration(hours: 24), (_) => _reputationService.applyDecay());
 
   final server = await ioshelf.serve(handler, address, port);
-  _log.info('Hub listening on ws://${server.address.host}:${server.port}');
+  _log.info('Hub listening on http://${server.address.host}:${server.port}');
+  _log.info('WebSocket available at ws://${server.address.host}:${server.port}/ws');
   return server;
 }
+
+double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  const p = 0.017453292519943295;
+  final a = 0.5 - cos((lat2 - lat1) * p) / 2 +
+      cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
+  return 12742 * asin(sqrt(a)); // 2 * R; R = 6371 km
+}
+
 
 void _handlePriceConvergence(Map<String, dynamic> msg) {
   final payload = msg[fieldPayload];
@@ -144,7 +198,7 @@ void _handlePriceConvergence(Map<String, dynamic> msg) {
         if (now.difference(candTime).inHours <= 1 && candPrice == price) {
           // BÔNUS! O usuário acertou a verdade oficial
           _reputationService.addBonus(candHash, 5);
-          
+
           // Notifica a rede sobre o ganho de reputação (para o termômetro do usuário)
           _broadcast(jsonEncode({
             fieldType: msgReputationUpdate,
@@ -206,7 +260,7 @@ Map<String, String>? _secrets;
 Map<String, String> _loadSecrets() {
   if (_secrets != null) return _secrets!;
   try {
-    final file = File('config/secrets.json');
+    final file = File('/config/secrets.json');
     if (file.existsSync()) {
       _secrets = Map<String, String>.from(jsonDecode(file.readAsStringSync()));
       return _secrets!;
@@ -236,14 +290,17 @@ void _handleMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
       final locationId = msg[fieldLocationId] as String;
       final region = msg[fieldRegion] as String;
       final wsUrl = msg[fieldWsUrl] as String;
+      final lat = msg['lat'] as double?;
+      final lng = msg['lng'] as double?;
 
       final nonce = _generateNonce();
       pendingChallenges[locationId] = nonce;
 
-      servers[id] = ServerInfo(id, locationId, region, wsUrl, DateTime.now());
+      servers[id] = ServerInfo(id, locationId, region, wsUrl, DateTime.now(), lat: lat, lng: lng);
       channelToServerId[channel] = id;
 
-      channel.sink.add(jsonEncode({fieldType: msgAuthChallenge, fieldNonce: nonce}));
+      channel.sink
+          .add(jsonEncode({fieldType: msgAuthChallenge, fieldNonce: nonce}));
       _log.info('Auth challenge sent to server $id for location $locationId');
       break;
 
@@ -330,7 +387,8 @@ void _handleMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
       final key = utf8.encode(password);
       final messageToSign = '$payloadString$timestamp$messageId';
       final hmac = Hmac(sha256, key);
-      final expectedSignature = hmac.convert(utf8.encode(messageToSign)).toString();
+      final expectedSignature =
+          hmac.convert(utf8.encode(messageToSign)).toString();
 
       if (signature != expectedSignature) {
         _sendError(channel, 'Invalid message signature');
@@ -362,7 +420,7 @@ void _handleMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
         _upstreamLink!.send(msg);
       }
       break;
-    
+
     case msgSyncResponse:
     case 'product_registration':
     case 'location_registration':
@@ -413,7 +471,7 @@ void _handleMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
     case msgGpiPropose:
       final payload = msg[fieldPayload] as Map<String, dynamic>;
       _log.info('Received GPI Proposal for ${payload['barcode']}');
-      
+
       // Processa a proposta (Normalização via AI se disponível)
       _gpiService.propose(payload).then((normalized) {
         // Responde ao solicitante
@@ -422,7 +480,7 @@ void _handleMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
           fieldBarcode: payload['barcode'],
           fieldPayload: normalized,
         }));
-        
+
         // Se normalizou com sucesso, pode propagar para cima se necessário
         if (_upstreamLink != null && _upstreamLink!.isConnected) {
           _upstreamLink!.send({
@@ -431,6 +489,21 @@ void _handleMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
           });
         }
       });
+      break;
+
+    case msgGpiDelete:
+      final barcode = msg[fieldBarcode] as String?;
+      if (barcode != null) {
+        _log.info('Received GPI Purge request for $barcode');
+        _gpiService.delete(barcode);
+        // Propaga para o hub superior se necessário
+        if (_upstreamLink != null && _upstreamLink!.isConnected) {
+          _upstreamLink!.send({
+            fieldType: msgGpiDelete,
+            fieldBarcode: barcode,
+          });
+        }
+      }
       break;
   }
 }
@@ -444,7 +517,8 @@ bool _validateMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
 
   switch (type) {
     case msgRegister:
-      return _checkFields(channel, msg, [fieldServerId, fieldLocationId, fieldRegion, fieldWsUrl]);
+      return _checkFields(channel, msg,
+          [fieldServerId, fieldLocationId, fieldRegion, fieldWsUrl]);
     case msgAuthResponse:
       return _checkFields(channel, msg, [fieldSignature]);
     case msgSubscribe:
@@ -455,7 +529,13 @@ bool _validateMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
     case msgSyncResponse:
       return true;
     case msgPublish:
-      if (!_checkFields(channel, msg, [fieldTopic, fieldPayload, fieldTimestamp, fieldMessageId, fieldSignature])) return false;
+      if (!_checkFields(channel, msg, [
+        fieldTopic,
+        fieldPayload,
+        fieldTimestamp,
+        fieldMessageId,
+        fieldSignature
+      ])) return false;
 
       // Validate topic format
       final topic = msg[fieldTopic] as String;
@@ -472,6 +552,10 @@ bool _validateMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
         return false;
       }
       return true;
+    case msgGpiLookup:
+      return _checkFields(channel, msg, [fieldBarcode]);
+    case msgGpiPropose:
+      return _checkFields(channel, msg, [fieldPayload]);
     case msgUnregister:
     case msgPong:
     case msgReputationUpdate:
@@ -486,7 +570,8 @@ bool _validateMessage(WebSocketChannel channel, Map<String, dynamic> msg) {
   }
 }
 
-bool _checkFields(WebSocketChannel channel, Map<String, dynamic> msg, List<String> fields) {
+bool _checkFields(
+    WebSocketChannel channel, Map<String, dynamic> msg, List<String> fields) {
   for (final field in fields) {
     if (msg[field] == null) {
       _sendError(channel, 'Missing required field: $field');
@@ -513,7 +598,8 @@ void _subscribeToTopic(WebSocketChannel channel, String topic) {
   _log.info('Subscribed to $topic');
 }
 
-void _broadcastToTopic(String topic, String message, {WebSocketChannel? exclude}) {
+void _broadcastToTopic(String topic, String message,
+    {WebSocketChannel? exclude}) {
   final subscribers = topics[topic] ?? {};
   for (final sub in subscribers) {
     if (sub != exclude) {
@@ -558,7 +644,10 @@ void _unregister(WebSocketChannel channel, {bool notifyPeers = false}) {
 
 void _notifyPeersUpdate(String region) {
   final regionTopic = 'region/$region';
-  final regionPeers = servers.values.where((s) => s.region == region).map((p) => p.toJson()).toList();
+  final regionPeers = servers.values
+      .where((s) => s.region == region)
+      .map((p) => p.toJson())
+      .toList();
 
   final updateMsg = jsonEncode({
     fieldType: msgPeersUpdate,
@@ -589,14 +678,15 @@ class _UpstreamHubLink {
     _log.info('Connecting to UPSTREAM Hub: $url');
     try {
       _channel = WebSocketChannel.connect(Uri.parse(url));
-      
+
       // Registro inicial
       _channel!.sink.add(jsonEncode({
         fieldType: msgRegister,
         fieldServerId: internalId,
         fieldLocationId: id,
         fieldRegion: region,
-        fieldWsUrl: 'internal://hub', // Hubs não tem WS pública direta para clientes do pai
+        fieldWsUrl:
+            'internal://hub', // Hubs não tem WS pública direta para clientes do pai
       }));
 
       _channel!.stream.listen(
@@ -642,18 +732,19 @@ class _UpstreamHubLink {
         final topic = msg[fieldTopic] as String;
         _broadcastToTopic(topic, jsonEncode(msg));
         break;
-      
+
       case msgPing:
         _channel!.sink.add(jsonEncode({fieldType: msgPong}));
         break;
-      
+
       case msgError:
         _log.severe('Upstream Hub Error: ${msg[fieldMessage]}');
         break;
     }
   }
 
-  void publish(String topic, dynamic payload, String timestamp, String messageId, String signature) {
+  void publish(String topic, dynamic payload, String timestamp,
+      String messageId, String signature) {
     if (!isConnected) return;
     _channel!.sink.add(jsonEncode({
       fieldType: msgPublish,

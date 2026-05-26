@@ -131,6 +131,7 @@ class _EstablishmentsScreenState extends ConsumerState<EstablishmentsScreen> {
       maxLat: position.latitude + degreeOffset,
       minLong: position.longitude - degreeOffset,
       maxLong: position.longitude + degreeOffset,
+      updatedAt: DateTime.now(),
     );
 
     await StorageService.locations.put(loc.id, loc);

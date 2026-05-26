@@ -4,9 +4,9 @@ import 'ai_service.dart';
 
 /// Service responsible for processing images to extract price information.
 class PriceProcessor {
-  final AIEngine aiEngine;
+  final AIEngine? aiEngine;
 
-  PriceProcessor({required this.aiEngine});
+  PriceProcessor({this.aiEngine});
 
   /// Analyzes the image bytes and returns the detected price.
   /// Strategy: Tesseract OCR (Fast) -> AI Vision (Precise fallback)
@@ -18,12 +18,16 @@ class PriceProcessor {
       return ocrPrice;
     }
 
-    // 2. Fallback to AI Vision (Multi-modal)
-    print('PriceProcessor: Tesseract falhou. Disparando fallback para IA...');
-    final aiPrice = await aiEngine.extractPriceFromImage(imageBytes);
-    if (aiPrice != null) {
-      print('PriceProcessor: Preço detectado via IA: $aiPrice');
-      return aiPrice;
+    // 2. Fallback to AI Vision (Multi-modal) se disponível
+    if (aiEngine != null) {
+      print('PriceProcessor: Tesseract falhou. Disparando fallback para IA...');
+      final aiPrice = await aiEngine!.extractPriceFromImage(imageBytes);
+      if (aiPrice != null) {
+        print('PriceProcessor: Preço detectado via IA: $aiPrice');
+        return aiPrice;
+      }
+    } else {
+      print('PriceProcessor: Tesseract falhou e IA local não disponível.');
     }
 
     return null;

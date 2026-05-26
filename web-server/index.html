@@ -3,71 +3,392 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>shopcomp.org | Transparência no Consumo</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <title>ShopComp – A Rede Colaborativa de Preços</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root { --black: #000; --white: #fff; --gray: #d4d4d4; }
-        * { box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; color: var(--black); background: var(--white); margin: 0; padding: 0; line-height: 1.2; }
-        
-        .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
-        
-        /* Grid Layout */
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; border-top: 2px solid var(--black); padding-top: 2rem; }
-        
-        header { padding: 4rem 0; }
-        h1 { font-size: 4rem; font-weight: 700; letter-spacing: -0.05em; margin: 0; }
-        .hero-sub { font-size: 1.5rem; font-weight: 300; margin-top: 1rem; color: #666; }
+        :root {
+            --green: #0a7c5b;
+            --green-light: #e6f4ef;
+            --blue: #1a3a5c;
+            --blue-dark: #0d2137;
+            --gold: #e8a838;
+            --gold-light: #fef7e8;
+            --white: #ffffff;
+            --gray-50: #f8fafc;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-500: #64748b;
+            --gray-700: #334155;
+            --gray-900: #0f172a;
+            --radius: 12px;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --shadow-lg: 0 12px 32px rgba(0,0,0,0.1);
+        }
 
-        .feature-block { border: 1px solid var(--black); padding: 2rem; min-height: 300px; }
-        .feature-block h3 { margin-top: 0; font-size: 1.5rem; text-transform: uppercase; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--gray-900);
+            background: var(--white);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
 
-        .contact-section { margin-top: 4rem; border-top: 2px solid var(--black); padding-top: 2rem; }
-        
-        form { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
-        .full-width { grid-column: span 2; }
-        input, select { width: 100%; padding: 1rem; border: 1px solid var(--black); font-family: inherit; }
-        button { background: var(--black); color: var(--white); padding: 1rem; border: none; cursor: pointer; font-weight: 700; text-transform: uppercase; }
-        
-        footer { margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--gray); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
-        
-        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } form { grid-template-columns: 1fr; } .full-width { grid-column: 1; } }
+        /* Navigation */
+        nav {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(255,255,255,0.85); backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 1rem 0;
+        }
+        .nav-inner {
+            max-width: 1200px; margin: 0 auto; padding: 0 2rem;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .logo {
+            font-weight: 800; font-size: 1.5rem; color: var(--blue-dark);
+            letter-spacing: -0.03em; text-decoration: none;
+        }
+        .logo span { color: var(--green); }
+        .nav-cta {
+            background: var(--green); color: var(--white); padding: 0.6rem 1.4rem;
+            border-radius: 100px; text-decoration: none; font-weight: 600; font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .nav-cta:hover { background: #0b6b4e; transform: translateY(-1px); }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+
+        /* Hero */
+        .hero {
+            padding: 6rem 0 5rem;
+            background: linear-gradient(135deg, #f0f9f6 0%, #e8f4f0 30%, #fefbf3 100%);
+            position: relative; overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute; top: -50%; right: -20%;
+            width: 600px; height: 600px;
+            background: radial-gradient(circle, rgba(10,124,91,0.08) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        .hero-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center;
+        }
+        .hero-badge {
+            display: inline-block; background: var(--gold-light); color: #b07d20;
+            padding: 0.4rem 1rem; border-radius: 100px; font-weight: 600; font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+        }
+        .hero h1 {
+            font-size: 3.5rem; font-weight: 800; line-height: 1.15; letter-spacing: -0.04em;
+            color: var(--blue-dark); margin-bottom: 1.5rem;
+        }
+        .hero h1 span { color: var(--green); }
+        .hero-sub {
+            font-size: 1.2rem; color: var(--gray-500); margin-bottom: 2rem; max-width: 480px;
+        }
+        .hero-buttons { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .btn-primary {
+            background: var(--green); color: var(--white); padding: 0.9rem 2rem;
+            border-radius: 100px; text-decoration: none; font-weight: 600; font-size: 1rem;
+            transition: all 0.2s; border: none; cursor: pointer; display: inline-block;
+        }
+        .btn-primary:hover { background: #0b6b4e; transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .btn-outline {
+            background: transparent; color: var(--blue-dark); padding: 0.9rem 2rem;
+            border-radius: 100px; text-decoration: none; font-weight: 600; font-size: 1rem;
+            border: 2px solid var(--gray-300); transition: all 0.2s;
+        }
+        .btn-outline:hover { border-color: var(--green); color: var(--green); }
+
+        .hero-visual {
+            display: flex; justify-content: center; align-items: center;
+        }
+        .hero-card {
+            background: var(--white); border-radius: var(--radius);
+            padding: 2rem; box-shadow: var(--shadow-lg);
+            border: 1px solid var(--gray-200); max-width: 400px; width: 100%;
+        }
+        .hero-card .price-row {
+            display: flex; justify-content: space-between; padding: 0.5rem 0;
+            border-bottom: 1px solid var(--gray-100);
+            font-size: 0.95rem;
+        }
+        .hero-card .price-row:last-child { border: none; font-weight: 700; color: var(--green); }
+        .hero-card .icon-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .dot-green { background: var(--green); }
+        .dot-gold { background: var(--gold); }
+
+        /* Section styles */
+        section { padding: 5rem 0; }
+        .section-label {
+            text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
+            font-size: 0.85rem; color: var(--green); margin-bottom: 0.75rem;
+        }
+        .section-title {
+            font-size: 2.5rem; font-weight: 700; letter-spacing: -0.03em;
+            color: var(--blue-dark); margin-bottom: 1rem;
+        }
+        .section-subtitle { color: var(--gray-500); font-size: 1.1rem; max-width: 600px; }
+
+        /* Features Grid */
+        .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; margin-top: 3rem; }
+        .feature-card {
+            background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius);
+            padding: 2rem; transition: all 0.3s;
+        }
+        .feature-card:hover {
+            box-shadow: var(--shadow-lg); transform: translateY(-4px); border-color: var(--green);
+        }
+        .feature-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; margin-bottom: 1.25rem;
+        }
+        .icon-green { background: var(--green-light); color: var(--green); }
+        .icon-blue { background: #e8f0f8; color: var(--blue); }
+        .icon-gold { background: var(--gold-light); color: var(--gold); }
+        .feature-card h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .feature-card p { color: var(--gray-500); font-size: 0.95rem; }
+
+        /* How it Works */
+        .how-section { background: var(--gray-50); }
+        .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; margin-top: 3rem; }
+        .step {
+            text-align: center; position: relative;
+        }
+        .step-number {
+            width: 56px; height: 56px; border-radius: 50%; background: var(--green);
+            color: var(--white); display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 1.5rem; margin: 0 auto 1.5rem;
+        }
+        .step h4 { font-weight: 700; margin-bottom: 0.5rem; }
+        .step p { color: var(--gray-500); font-size: 0.95rem; }
+
+        /* Trust Section */
+        .trust-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; margin-top: 3rem; }
+        .trust-visual {
+            background: linear-gradient(135deg, var(--blue-dark), #1a4a3a);
+            border-radius: var(--radius); padding: 2rem; color: var(--white);
+        }
+        .trust-item { display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 1.5rem; }
+        .trust-item .check { font-size: 1.3rem; color: var(--green-light); flex-shrink: 0; }
+        .trust-item h4 { font-weight: 700; margin-bottom: 0.25rem; }
+        .trust-item p { color: #cbd5e1; font-size: 0.9rem; }
+
+        /* CTA Section */
+        .cta-section { background: var(--blue-dark); color: var(--white); text-align: center; }
+        .cta-section .section-title { color: var(--white); }
+        .cta-section .section-subtitle { color: #94a3b8; margin: 0 auto 2rem; }
+        .cta-form {
+            max-width: 500px; margin: 0 auto; display: grid; gap: 1rem;
+        }
+        .cta-form input, .cta-form select {
+            width: 100%; padding: 0.9rem 1.2rem; border-radius: 100px;
+            border: 1px solid var(--gray-300); font-family: inherit; font-size: 1rem;
+            background: var(--white);
+        }
+        .cta-form button {
+            background: var(--green); color: var(--white); padding: 0.9rem 2rem;
+            border-radius: 100px; font-weight: 600; font-size: 1rem; border: none;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .cta-form button:hover { background: #0b6b4e; transform: translateY(-2px); }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--gray-200); padding: 2rem 0;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.85rem; color: var(--gray-500);
+        }
+        .footer-links { display: flex; gap: 2rem; }
+        .footer-links a { color: var(--gray-500); text-decoration: none; }
+        .footer-links a:hover { color: var(--green); }
+
+        @media (max-width: 768px) {
+            .hero-grid, .features-grid, .steps, .trust-grid { grid-template-columns: 1fr; }
+            .hero h1 { font-size: 2.5rem; }
+            .section-title { font-size: 2rem; }
+            .hero-visual { order: -1; margin-bottom: 2rem; }
+            footer { flex-direction: column; gap: 1rem; text-align: center; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>ShopComp.</h1>
-            <div class="hero-sub">Transparência radical no consumo e controle total do seu orçamento.</div>
-        </header>
+    <nav>
+        <div class="nav-inner">
+            <a href="/" class="logo">Shop<span>Comp</span></a>
+            <a href="#early-access" class="nav-cta">Acessar App</a>
+        </div>
+    </nav>
 
-        <section class="grid">
-            <div class="feature-block">
-                <h3>O fim da surpresa no caixa</h3>
-                <p>O shopcomp.org resolve a dor de não saber o valor final da compra. Acompanhe seu saldo em tempo real, item a item.</p>
+    <!-- Hero -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-grid">
+                <div>
+                    <span class="hero-badge">🔗 Rede Federada Aberta</span>
+                    <h1>Preços reais, <span>comunidade real</span></h1>
+                    <p class="hero-sub">
+                        Chega de depender de planilhas ou da memória. Compare preços entre mercados próximos, 
+                        em tempo real, com dados fornecidos por pessoas como você.
+                    </p>
+                    <div class="hero-buttons">
+                        <a href="#early-access" class="btn-primary">Quero participar</a>
+                        <a href="#como-funciona" class="btn-outline">Como funciona</a>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="hero-card">
+                        <div style="font-weight:700; margin-bottom:1rem;">🛒 Comparação ao vivo</div>
+                        <div class="price-row"><span><span class="icon-dot dot-green"></span>Mercado Bom Preço</span><span>R$ 22,90</span></div>
+                        <div class="price-row"><span><span class="icon-dot dot-green"></span>Feira do Bairro</span><span>R$ 19,50</span></div>
+                        <div class="price-row"><span><span class="icon-dot dot-gold"></span>Super Oferta</span><span>R$ 24,30</span></div>
+                        <div class="price-row" style="margin-top:0.5rem; padding-top:0.5rem; border-top:2px solid var(--gray-200);">
+                            <span>💡 Melhor escolha</span><span>Feira do Bairro</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="feature-block">
-                <h3>Federação ética de dados</h3>
-                <p>Nós não somos uma big tech coletando dados. Somos uma rede de locais que devolvem ao consumidor o poder de decisão.</p>
-            </div>
-        </section>
+        </div>
+    </section>
 
-        <section class="contact-section">
-            <h2>Seja um pioneiro</h2>
-            <form action="https://poison-subject-went-economic.trycloudflare.com/webhook/lead-capture" method="POST">
-                <input type="text" name="name" placeholder="Nome Completo" class="full-width" required>
-                <select name="type">
+    <!-- Features -->
+    <section id="recursos">
+        <div class="container">
+            <div class="section-label">Funcionalidades</div>
+            <h2 class="section-title">Tudo que você precisa para economizar</h2>
+            <p class="section-subtitle">Ferramentas pensadas para consumidores e donos de estabelecimentos, sem burocracia.</p>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon icon-green">📱</div>
+                    <h3>Offline-first</h3>
+                    <p>Funciona sem internet. Os dados sincronizam automaticamente quando você estiver online.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon icon-blue">🤖</div>
+                    <h3>Extração por IA</h3>
+                    <p>Escanee o código de barras ou a nota fiscal. A IA preenche nome, marca e preço para você.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon icon-gold">🗺️</div>
+                    <h3>Mapa de preços</h3>
+                    <p>Visualize num mapa onde comprar cada produto mais barato, com distância até você.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon icon-green">🔐</div>
+                    <h3>Privacidade real</h3>
+                    <p>Seus dados de consumo ficam no seu dispositivo. Você decide o que compartilha com a rede.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon icon-blue">🏪</div>
+                    <h3>Feed de ofertas</h3>
+                    <p>Estabelecimentos publicam promoções oficiais. Você vê apenas o que interessa, sem spam.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon icon-gold">⚡</div>
+                    <h3>Lista inteligente</h3>
+                    <p>Monte sua lista e o app calcula onde comprar gastando menos, considerando os deslocamentos.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How it Works -->
+    <section id="como-funciona" class="how-section">
+        <div class="container">
+            <div class="section-label">Como funciona</div>
+            <h2 class="section-title">Em três passos simples</h2>
+            <p class="section-subtitle">Nada de cadastro complexo ou contratos. É rápido, gratuito e aberto.</p>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h4>Escanee ou busque</h4>
+                    <p>Aponte a câmera para o código de barras ou digite o nome do produto.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h4>Informe o preço</h4>
+                    <p>Registre quanto custou. Se preferir, o app extrai automaticamente da nota fiscal.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h4>Compare e economize</h4>
+                    <p>Veja onde o mesmo produto está mais barato e planeje suas compras com inteligência.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Trust / Federation -->
+    <section>
+        <div class="container">
+            <div class="trust-grid">
+                <div class="trust-visual">
+                    <div style="font-weight:700; font-size:1.2rem; margin-bottom:1.5rem;">🛡️ Nossa rede é diferente</div>
+                    <div class="trust-item">
+                        <span class="check">✓</span>
+                        <div><h4>Federação descentralizada</h4><p>Cada comunidade roda seu próprio servidor. Ninguém controla tudo.</p></div>
+                    </div>
+                    <div class="trust-item">
+                        <span class="check">✓</span>
+                        <div><h4>Open source</h4><p>Código aberto e auditável. Qualquer pessoa pode inspecionar, modificar e melhorar.</p></div>
+                    </div>
+                    <div class="trust-item">
+                        <span class="check">✓</span>
+                        <div><h4>Sem rastreamento</h4><p>Não coletamos dados pessoais nem vendemos informações. Sua privacidade importa.</p></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="section-label">Nossos princípios</div>
+                    <h2 class="section-title">Tecnologia a serviço da comunidade</h2>
+                    <p class="section-subtitle">
+                        Diferente de aplicativos que monetizam seus dados, o ShopComp é mantido por uma rede 
+                        de voluntários, mercados locais e consumidores que acreditam em transparência.
+                    </p>
+                    <p style="margin-top:1rem; color: var(--gray-500);">
+                        Os dados de preços pertencem à comunidade. Nenhuma empresa controla ou manipula 
+                        as informações que você vê.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Early Access Form -->
+    <section id="early-access" class="cta-section">
+        <div class="container">
+            <h2 class="section-title">Participe da rede</h2>
+            <p class="section-subtitle">
+                Seja um dos primeiros a usar o ShopComp. Para consumidores que querem economizar 
+                ou estabelecimentos que desejam divulgar ofertas reais.
+            </p>
+            <form class="cta-form" action="https://poison-subject-went-economic.trycloudflare.com/webhook/lead-capture" method="POST">
+                <input type="text" name="name" placeholder="Nome completo" required>
+                <select name="type" required>
+                    <option value="" disabled selected>Seu perfil</option>
                     <option value="pf">Consumidor (Pessoa Física)</option>
                     <option value="pj">Estabelecimento (Pessoa Jurídica)</option>
                 </select>
-                <input type="email" name="email" placeholder="E-mail" required>
-                <button type="submit" class="full-width">Solicitar Acesso Antecipado</button>
+                <input type="email" name="email" placeholder="Seu melhor e-mail" required>
+                <button type="submit">Solicitar acesso antecipado</button>
             </form>
-        </section>
+            <p style="font-size:0.8rem; color:#94a3b8; margin-top:1rem;">Sem spam. Apenas o convite para acessar o app.</p>
+        </div>
+    </section>
 
-        <footer>
-            <p>ShopComp.org &copy; 2026. A evolução do consumo colaborativo.</p>
-        </footer>
-    </div>
+    <footer class="container">
+        <div>ShopComp.org &copy; 2026 · Transparência no consumo</div>
+        <div class="footer-links">
+            <a href="https://github.com">GitHub</a>
+            <a href="#recursos">Recursos</a>
+            <a href="#early-access">Acesso</a>
+        </div>
+    </footer>
 </body>
 </html>

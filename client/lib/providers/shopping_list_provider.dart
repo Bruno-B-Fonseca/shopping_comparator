@@ -1,3 +1,4 @@
+import 'package:client/models/cart_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/shopping_list.dart';
@@ -54,7 +55,7 @@ class ShoppingListNotifier extends StateNotifier<List<ShoppingList>> {
         }
         return item;
       }).toList();
-      
+
       final updatedList = list.copyWith(
         items: updatedItems,
         updatedAt: DateTime.now(),
@@ -67,7 +68,9 @@ class ShoppingListNotifier extends StateNotifier<List<ShoppingList>> {
   Future<void> removeItemFromList(String listId, String itemId) async {
     final list = StorageService.shoppingLists.get(listId);
     if (list != null) {
-      final updatedItems = list.items.where((item) => item.id != itemId).toList();
+      final updatedItems = list.items
+          .where((item) => item.id != itemId)
+          .toList();
       final updatedList = list.copyWith(
         items: updatedItems,
         updatedAt: DateTime.now(),
@@ -76,9 +79,34 @@ class ShoppingListNotifier extends StateNotifier<List<ShoppingList>> {
       _loadLists();
     }
   }
+
+  Future<void> createListFromCart(String name, List<CartItem> cartItems) async {
+    final listItems = cartItems.map((item) {
+      final product = StorageService.products.get(item.barcode);
+      return ShoppingListItem(
+        id: const Uuid().v4(),
+        barcode: item.barcode,
+        name: product?.name ?? 'Produto ${item.barcode}',
+        category: product?.canonicalCategory,
+        quantity: item.quantity,
+        createdAt: DateTime.now(),
+      );
+    }).toList();
+
+    final newList = ShoppingList(
+      id: const Uuid().v4(),
+      name: name,
+      items: listItems,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    await StorageService.shoppingLists.put(newList.id, newList);
+    _loadLists();
+  }
 }
 
 final shoppingListProvider =
     StateNotifierProvider<ShoppingListNotifier, List<ShoppingList>>((ref) {
-  return ShoppingListNotifier();
-});
+      return ShoppingListNotifier();
+    });

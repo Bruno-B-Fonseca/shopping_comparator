@@ -47,7 +47,11 @@ Para respeitar a privacidade, o cálculo de otimização ocorre inteiramente no 
 - **Offline**: A otimização deve funcionar mesmo sem internet, usando os preços cacheados na última sincronização.
 
 ## 8. Etapas de Execução
-1. **Passo 1**: Implementar o CRUD de `ShoppingList`.
+1. **Passo 0 (Fundação Inteligente)**:
+    - Implementar `Autocomplete` na adição de itens buscando no banco de produtos local.
+    - Se um código EAN desconhecido for digitado, disparar `product_request` para o Hub/IA.
+    - Vincular itens da lista ao `barcode` oficial para garantir a precisão da otimização.
+2. **Passo 1**: Implementar o CRUD de `ShoppingList`.
 2. **Passo 2**: Criar o motor de busca por categoria canônica na base de preços.
 3. **Passo 3**: Desenvolver a lógica de agrupamento por estabelecimento (Otimizador).
 4. **Passo 4**: Adicionar visualização de economia e rotas.

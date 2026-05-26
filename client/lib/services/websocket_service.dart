@@ -122,9 +122,6 @@ class WebSocketService {
         debugPrint('WebSocket: Conexão estabelecida com sucesso!');
         _reconnectAttempts = 0;
         _updateStatus(WebSocketStatus.connected);
-
-        // Solicita sincronização inicial de dados
-        sendMessage({'type': 'sync_request'});
       }).catchError((e) {
         debugPrint('WebSocket: Erro na prontidão da conexão: $e');
         _updateStatus(WebSocketStatus.disconnected);

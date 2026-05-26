@@ -1,75 +1,55 @@
-# Shopping Comparator MVP
+# Shopping Comparator
 
-A collaborative, decentralized shopping cart and price comparison ecosystem.
+O Shopping Comparator é um ecossistema colaborativo e descentralizado de comparação de preços. Desenvolvido com foco em dispositivos móveis (Flutter Web/PWA) e infraestrutura baseada em Dart, o projeto permite que usuários colaborem em tempo real na manutenção de preços, registrem produtos via escaneamento e recebam estratégias de economia baseadas em geolocalização.
 
-## Core Modules
-- **Client (`client/`)**: Flutter Web PWA. Handles local storage (Hive), interactive maps, and the promotional feed.
-- **Hub (`hub/`)**: Tiered Federation Server. Manages regional connections and bridges data to National Hubs.
-- **Server (`server/`)**: Local WebSocket & Storage Proxy. Handles AI product extraction and MinIO image management.
+## Módulos Principais
+- **Cliente (`client/`)**: Aplicação Flutter Web. Focada em offline-first (Hive), mapas interativos e sincronização via WebSockets.
+- **Hub (`hub/`)**: Servidor de Federação em camadas. Gerencia registros regionais, tópicos de sincronização e retransmissão de mensagens entre clusters.
+- **Servidor (`server/`)**: Proxy de WebSocket e Armazenamento (BFF). Responsável pela extração de produtos via IA, processamento de Notas Fiscais (NFC-e) e integração com MinIO para armazenamento de imagens.
 
-## Key Features
+## Funcionalidades Chave
 
-### 1. Decentralized & Collaborative
-- **Hierarchical Federation**: Servers connect to Regional Hubs, which can optionally link to a National Hub, creating a multi-tier data mesh.
-- **Real-time Synchronization**: New sessions automatically request missing state (locations, products, prices, and promotions) from active peers via `sync_request`.
-- **Offline-first Architecture**: All data is cached locally in Hive. Changes sync instantly when online.
+### 1. Federação e Colaboração
+- **Arquitetura Federada**: Servidores de estabelecimentos conectam-se a Hubs Regionais e Nacionais, criando uma malha de dados resiliente.
+- **Sincronização P2P**: Clientes sincronizam automaticamente estados de produtos e preços ao se conectarem, usando uma lógica de "Sync Request" para recuperar dados perdidos enquanto offline.
+- **Offline-first**: Dados são persistidos localmente (Hive) e sincronizados assim que a conectividade é detectada.
 
-### 2. Smart Price Collection
-- **Geofenced Sharing**: Prices scanned within a registered establishment's area are shared with the community. 
-- **Private Mode**: Scans performed outside registered areas are stored locally and kept private (prefixed with `private_`).
-- **AI-Powered Extraction**: Automatic product metadata registration and price detection from images using Google Gemini or Ollama.
+### 2. Coleta Inteligente e Automação
+- **Registro Automático via IA**: Quando um código de barras é escaneado e não encontrado, o servidor busca automaticamente metadados (nome, marca) e imagens na web, utilizando modelos de IA (Gemini/Ollama) para estruturar os dados.
+- **Atualização de Preços via NFC-e**: Operadores podem processar lotes de preços escaneando o QR Code de Notas Fiscais, com descarte rigoroso de PII (dados sensíveis) em memória, garantindo integridade dos dados e conformidade com LGPD.
 
-### 3. Promotional Feed (Formerly Chat)
-- **Digital Flyer**: The chat is transformed into a unidirectional feed of official offers.
-- **Operator-only Posting**: Only authorized operators can post promotions (signed with HMAC).
-- **Rich Media**: Promotions include titles, descriptions, large banner images, and highlighted pricing.
+### 3. Integração com MinIO
+- **Storage de Imagens**: Migração completa do armazenamento Base64 para MinIO (compatível com S3). Imagens são hospedadas e servidas via URLs internas, reduzindo a carga de sincronização e o consumo de memória do dispositivo.
 
-### 4. Establishment Management
-- **Interactive Map**: Operators define their market location using an integrated `flutter_map` with precise coordinate selection.
-- **Geofence Visualization**: Dynamic visual feedback of the coverage perimeter directly on the map.
-- **Unified Controls**: A single management card for operators to create or update their unique establishment.
+### 4. Inteligência de Consumo
+- **Otimização de Lista de Compras**: Motor local (dispositivo) que calcula a melhor estratégia de compra (menor valor total e menor número de deslocamentos) baseado nos preços registrados na região.
+- **Reputação (Web of Trust)**: Sistema de gamificação anônima que pontua colaboradores baseando-se na convergência de preços informados com dados oficiais (NFC-e).
 
-## Infrastructure & Security
+## Infraestrutura e Segurança
+- **Identidade HMAC**: Ações oficiais (promoções, registros de preço) são assinadas com chaves HMAC, garantindo a autenticidade dos dados e prevenindo spoofing ou injeções maliciosas.
+- **Geo-Discovery**: Os nós da rede se auto-descobrem baseados em geolocalização, facilitando a adesão de novos estabelecimentos sem configuração manual pesada.
+- **Resiliência**: Mecanismo de outbox (fila de uploads pendentes) para garantir que contribuições feitas em locais sem sinal não sejam perdidas.
 
-### Public Access (Cloudflare Tunnel)
-The project uses **Cloudflare Tunnel (`cloudflared`)** for stable public access, bypassing traditional port forwarding and ngrok limits.
-- **Dynamic Mode**: Generates a temporary `.trycloudflare.com` URL on startup.
-- **Persistent Mode**: Use `CLOUDFLARE_TUNNEL_TOKEN` in `.env` for a fixed custom DNS.
+## Desenvolvimento
 
-### HMAC-SHA256 Security
-Every official action (establishment registration, promotional post) is cryptographically signed.
-- **Hub Level**: Validates signatures against `hub/config/secrets.json`.
-- **Server Level**: Signs messages using `LOCATION_PASSWORD`.
-- **Client Level**: Restricts UI management features to the matching `LOCATION_ID`.
+### Pré-requisitos
+- Docker e Docker Compose
+- Flutter SDK (Web) e Dart SDK
 
-## How to Run
-
-### 1. Setup
-1. Copy `.env.example` to `.env`.
-2. (Optional) Create `hub/config/secrets.json` with authorized operators:
-   ```json
-   { "my-location-id": "my-secret-password" }
-   ```
-
-### 2. Deploy (Local + Hub)
+### Execução (Docker Compose)
 ```bash
-docker-compose -f docker-compose-federated.yml up -d --build
+docker-compose up -d --build
 ```
 - **App**: http://localhost:8081
-- **Tunnel URL**: Run `docker compose logs tunnel` to find your public link.
 
-## Development
+### Código
+Para trabalhar no projeto:
+1. Sincronize dependências (`pub get`).
+2. Utilize `build_runner` para regenerar adaptadores e serializadores após modificar modelos:
+   ```bash
+   cd client && dart run build_runner build --delete-conflicting-outputs
+   ```
+3. Rode o servidor e hub localmente para testes de federação.
 
-### Client (Flutter)
-```bash
-cd client
-flutter pub get
-dart run build_runner build --delete-conflicting-outputs
-flutter run -d chrome
-```
-
-### Hub & Server (Dart)
-```bash
-cd hub && dart pub get && dart run bin/hub.dart
-cd server && dart pub get && dart run bin/server.dart
-```
+---
+*Status: MVP em evolução constante com foco em resiliência e integridade de dados federados.*

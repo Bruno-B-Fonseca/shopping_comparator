@@ -14,26 +14,31 @@ class OllamaEngine implements AIEngine {
   final String baseUrl;
   final String model;
 
-  OllamaEngine({required this.baseUrl, this.model = 'qwen2.5:latest'});
+  OllamaEngine({String? baseUrl, String? model})
+    : baseUrl = baseUrl ?? 'http://localhost:11434',
+      model = model ?? 'llama3.2:3b';
 
   @override
   Future<void> warmup() async {
-    print('AI: Enviando "Bom dia" para o Ollama para aquecimento...');
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/generate'),
-        body: jsonEncode({
-          'model': model,
-          'prompt': 'Bom dia! Apenas responda "Bom dia" para confirmar que você está pronto.',
-          'stream': false,
-        }),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/generate'),
+            body: jsonEncode({
+              'model': model,
+              'prompt':
+                  'Bom dia! Apenas responda "Bom dia" para confirmar que você está pronto.',
+              'stream': false,
+            }),
+          )
+          .timeout(const Duration(seconds: 5)); // Reduzido para fail-fast
 
       if (response.statusCode == 200) {
-        print('AI: Ollama aquecido com sucesso.');
+        print('AI: Ollama aquecido com sucesso em $baseUrl');
       }
     } catch (e) {
-      print('AI: Falha no aquecimento do Ollama: $e');
+      // Log conciso para não poluir o Standalone Mode
+      print('AI: IA local indisponível em $baseUrl (Modo Standalone Ativo)');
     }
   }
 
@@ -78,11 +83,14 @@ If no price is found, return {"price": null}.
   ) async {
     final prompt =
         '''
-Extract product information from the following search results for a barcode.
-Return ONLY a JSON object with these fields:
-- name: Full descriptive name of the product.
-- unit: Quantity and unit combined (e.g., "100g", "1L", "2Kg", "500ml", "1un"). Look for these details in the title.
-- manufacturer: Brand or manufacturer name.
+Extract product information from the following search results for a specific barcode.
+
+CRITICAL RULES:
+1. The product MUST match the intended barcode. If the results are clearly for a different product or barcode, return {"error": "mismatch"}.
+2. If you are unsure or the results are contradictory, return {"error": "low_confidence"}.
+3. name: Full descriptive name of the product (in Portuguese if possible).
+4. unit: Quantity and unit combined (e.g., "12 unidades", "1kg", "500ml").
+5. manufacturer: Brand or manufacturer name.
 
 Search Results:
 $searchText
@@ -167,11 +175,14 @@ If no price is found, return {"price": null}.
     final model = GenerativeModel(model: modelName, apiKey: apiKey);
     final prompt =
         '''
-Extract product information from the following search results for a barcode.
-Return ONLY a JSON object with these fields:
-- name: Full descriptive name of the product.
-- unit: Quantity and unit combined (e.g., "100g", "1L", "2Kg", "500ml", "1un"). Look for these details in the title.
-- manufacturer: Brand or manufacturer name.
+Extract product information from the following search results for a specific barcode.
+
+CRITICAL RULES:
+1. The product MUST match the intended barcode. If the results are clearly for a different product or barcode, return {"error": "mismatch"}.
+2. If you are unsure or the results are contradictory, return {"error": "low_confidence"}.
+3. name: Full descriptive name of the product (in Portuguese if possible).
+4. unit: Quantity and unit combined (e.g., "12 unidades", "1kg", "500ml").
+5. manufacturer: Brand or manufacturer name.
 
 Search Results:
 $searchText

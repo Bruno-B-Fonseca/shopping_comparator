@@ -19,8 +19,10 @@ final webSocketServiceProvider = Provider<WebSocketService>((ref) {
     if (kIsWeb) {
       final uri = Uri.base;
       final protocol = uri.scheme == 'https' ? 'wss' : 'ws';
+      // No modo Nginx, o WebSocket é servido na mesma porta do site através do path /ws
       final port = uri.hasPort ? ':${uri.port}' : '';
       wsUrl = '$protocol://${uri.host}$port/ws';
+      debugPrint('WebSocketProvider: Usando URL dinâmica do navegador: $wsUrl');
     }
 
     service.connect(wsUrl);

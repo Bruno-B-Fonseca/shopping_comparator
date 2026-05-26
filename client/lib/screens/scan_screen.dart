@@ -15,11 +15,14 @@ import '../services/storage_service.dart';
 import '../services/websocket_service.dart';
 import '../services/image_service.dart';
 import '../services/reputation_service.dart';
+import '../utils/barcode_utils.dart';
 import '../widgets/barcode_scanner_widget.dart';
 import '../widgets/empty_state_widget.dart';
 import '../widgets/location_consent_dialog.dart';
 import '../widgets/product_image_picker.dart';
 import '../widgets/confidence_thermometer.dart';
+import '../widgets/category_tag_input.dart';
+import '../widgets/nutritional_info_input.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
   final String? initialBarcode;
@@ -71,11 +74,25 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   }
 
   void _lookupProduct([String? barcode]) async {
-    final code = barcode ?? _barcodeController.text;
+    String code = barcode ?? _barcodeController.text;
     if (code.isEmpty) return;
 
-    if (barcode != null) {
-      _barcodeController.text = barcode;
+    code = BarcodeUtils.clean(code);
+
+    if (!BarcodeUtils.isValidEan(code)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Código de barras inválido (EAN-8/13 esperado).'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (barcode != null || _barcodeController.text != code) {
+      _barcodeController.text = code;
     }
 
     final product = StorageService.products.get(code);
@@ -119,31 +136,27 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       );
     }
 
-    // Aguarda até 15 segundos por uma resposta (aumentado para dar tempo à IA)
+    // Aguarda até 15 segundos por uma resposta
     for (int i = 0; i < 30; i++) {
       await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
 
       final foundProduct = StorageService.products.get(code);
       if (foundProduct != null) {
-        // Produto localizado! Agora damos mais 1 segundo pro preço chegar (mensagens separadas)
-        for (int j = 0; j < 5; j++) {
-          final pList = StorageService.prices.values
-              .where((p) => p.barcode == code)
-              .toList();
-          if (pList.isNotEmpty) break;
-          await Future.delayed(const Duration(milliseconds: 200));
-        }
-
+        // Produto localizado! 
+        // Forçamos a atualização imediata do estado
         setState(() {
           _currentProduct = foundProduct;
           _isSearchingCluster = false;
           _updatePriceFromStorage(code);
         });
 
-        final pricesExist = StorageService.prices.values.any(
-          (p) => p.barcode == code,
-        );
+        // Verificamos preço
+        final pList = StorageService.prices.values
+            .where((p) => p.barcode == code)
+            .toList();
+        
+        final pricesExist = pList.isNotEmpty;
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -202,6 +215,56 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     await _getPositionWithConsent();
   }
 
+  void _forceReRegistration(BuildContext context, String barcode) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmar Purga'),
+        content: const Text(
+          'Isso apagará os dados atuais do seu celular e do Hub, '
+          'solicitando uma nova pesquisa à IA. Continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Não'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // 1. Apaga localmente
+              StorageService.products.delete(barcode);
+              
+              // 2. Solicita novo cadastro e purga no hub
+              final ws = ref.read(webSocketServiceProvider);
+              
+              // Avisa o hub para purgar globalmente
+              ws.sendMessage({
+                'type': 'gpi_delete',
+                'barcode': barcode,
+              });
+
+              // Solicita nova pesquisa
+              ws.sendMessage({
+                'type': 'product_request',
+                'payload': {'barcode': barcode, 'force': true},
+              });
+
+              Navigator.pop(ctx); // Fecha confirmação
+              Navigator.pop(context); // Fecha diálogo de edição
+              
+              _resetScan(); // Limpa a tela de scan
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Solicitada nova pesquisa para este EAN...')),
+              );
+            },
+            child: const Text('Sim, Resetar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showEditProductDialog(Product product) {
     final nameController = TextEditingController(text: product.name);
     final manufacturerController = TextEditingController(
@@ -220,8 +283,18 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Editar Produto'),
+          title: Row(
+            children: [
+              const Expanded(child: Text('Editar Produto')),
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.orange),
+                tooltip: 'Forçar Re-cadastro (Purga local e Hub)',
+                onPressed: () => _forceReRegistration(context, product.barcode),
+              ),
+            ],
+          ),
           content: SingleChildScrollView(
+
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -271,19 +344,21 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     labelText: 'Unidade (ex: 1kg, 500ml)',
                   ),
                 ),
-                TextField(
-                  controller: categoryController,
-                  decoration: const InputDecoration(
-                    labelText: 'Categoria Canônica (ex: PADARIA > PAO)',
-                  ),
+                const SizedBox(height: 16),
+                CategoryTagInput(
+                  initialValue: product.canonicalCategory,
+                  onChanged: (value) {
+                    categoryController.text = value;
+                  },
                 ),
-                TextField(
-                  controller: nutritionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Info Nutricional',
-                  ),
-                  maxLines: 3,
+                const SizedBox(height: 16),
+                NutritionalInfoInput(
+                  initialValue: product.nutritionalInfo,
+                  onChanged: (value) {
+                    nutritionController.text = value;
+                  },
                 ),
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -294,9 +369,18 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             ),
             ElevatedButton(
               onPressed: () {
+                final name = nameController.text.trim();
+                
+                if (name.toLowerCase().contains('barcode scanner')) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Nome de produto inválido.')),
+                  );
+                  return;
+                }
+
                 final updatedProduct = Product(
                   barcode: product.barcode,
-                  name: nameController.text.trim(),
+                  name: name,
                   manufacturer: manufacturerController.text.trim(),
                   unit: unitController.text.trim(),
                   nutritionalInfo: nutritionController.text.trim(),
@@ -305,6 +389,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                   canonicalCategory: categoryController.text.trim().isEmpty
                       ? null
                       : categoryController.text.trim(),
+                  updatedAt: DateTime.now(),
                 );
 
                 StorageService.products.put(product.barcode, updatedProduct);

@@ -33,6 +33,9 @@ class LocationModel extends HiveObject {
   @HiveField(8)
   final double? maxLong;
 
+  @HiveField(9)
+  final DateTime? updatedAt;
+
   LocationModel({
     required this.id,
     required this.name,
@@ -43,6 +46,7 @@ class LocationModel extends HiveObject {
     this.maxLat,
     this.minLong,
     this.maxLong,
+    this.updatedAt,
   });
 
   factory LocationModel.fromJson(Map<String, dynamic> json) =>

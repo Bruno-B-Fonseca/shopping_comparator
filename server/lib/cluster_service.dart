@@ -15,8 +15,11 @@ class ClusterService {
   final String locationId;
   final String locationPassword;
   final String publicWsUrl;
+  final double? lat;
+  final double? lng;
 
   late WebSocketChannel _hubChannel;
+  bool _isConnecting = false;
   final Function(Map<String, dynamic> payload, String originServerId)
   onRelayMessage;
 
@@ -30,32 +33,55 @@ class ClusterService {
     required this.locationId,
     required this.locationPassword,
     required this.onRelayMessage,
+    this.lat,
+    this.lng,
   }) : serverId = const Uuid().v4();
 
   void connect() {
-    _log.info('Connecting to Hub: $hubUrl');
-    _hubChannel = WebSocketChannel.connect(Uri.parse(hubUrl));
+    if (_isConnecting) return;
+    _isConnecting = true;
 
-    // Passo 1: Iniciar registro (o Hub enviará o desafio)
-    _hubChannel.sink.add(
-      jsonEncode({
-        fieldType: msgRegister,
-        fieldServerId: serverId,
-        fieldLocationId: locationId,
-        fieldRegion: region,
-        fieldWsUrl: publicWsUrl,
-      }),
-    );
+    runZonedGuarded(() {
+      _log.info('Connecting to Hub: $hubUrl');
+      _hubChannel = WebSocketChannel.connect(Uri.parse(hubUrl));
 
-    _hubChannel.stream.listen(
-      (message) {
-        _log.info('Received from Hub: $message');
-        final msg = jsonDecode(message as String);
-        _handleHubMessage(msg);
-      },
-      onDone: () => _log.warning('Disconnected from Hub'),
-      onError: (e) => _log.severe('Hub error: $e'),
-    );
+      _hubChannel.stream.listen(
+        (message) {
+          _isConnecting = false;
+          _log.info('Received from Hub: $message');
+          final msg = jsonDecode(message as String);
+          _handleHubMessage(msg);
+        },
+        onDone: () {
+          _isConnecting = false;
+          _log.warning('Disconnected from Hub. Retrying in 10s...');
+          Future.delayed(const Duration(seconds: 10), connect);
+        },
+        onError: (e) {
+          _isConnecting = false;
+          _log.severe('Hub stream error: $e. Retrying in 10s...');
+          Future.delayed(const Duration(seconds: 10), connect);
+        },
+        cancelOnError: true,
+      );
+
+      // Passo 1: Iniciar registro (O Hub enviará o desafio)
+      _hubChannel.sink.add(
+        jsonEncode({
+          fieldType: msgRegister,
+          fieldServerId: serverId,
+          fieldLocationId: locationId,
+          fieldRegion: region,
+          fieldWsUrl: publicWsUrl,
+          'lat': lat,
+          'lng': lng,
+        }),
+      );
+    }, (error, stack) {
+      _isConnecting = false;
+      _log.severe('Cluster background error: $error. Retrying in 10s...');
+      Future.delayed(const Duration(seconds: 10), connect);
+    });
   }
 
   void _handleHubMessage(Map<String, dynamic> msg) {
@@ -124,6 +150,8 @@ class ClusterService {
         fieldLocationId: locationId,
         fieldRegion: region,
         fieldWsUrl: wsUrl,
+        'lat': lat,
+        'lng': lng,
         'status': 'ok',
         'ai_version': '1.0.0',
       }),
@@ -150,21 +178,29 @@ class ClusterService {
     final hmac = Hmac(sha256, key);
     final signature = hmac.convert(utf8.encode(messageToSign)).toString();
 
-    _hubChannel.sink.add(
-      jsonEncode({
-        fieldType: msgPublish,
-        fieldTopic: topic,
-        fieldPayload: payload,
-        fieldTimestamp: timestamp,
-        fieldMessageId: messageId,
-        fieldSignature: signature,
-      }),
-    );
+    try {
+      _hubChannel.sink.add(
+        jsonEncode({
+          fieldType: msgPublish,
+          fieldTopic: topic,
+          fieldPayload: payload,
+          fieldTimestamp: timestamp,
+          fieldMessageId: messageId,
+          fieldSignature: signature,
+        }),
+      );
+    } catch (e) {
+      _log.warning('Cluster: Falha ao publicar (Hub offline): $e');
+    }
   }
 
   void subscribe(List<String> topics) {
-    _hubChannel.sink.add(
-      jsonEncode({fieldType: msgSubscribe, fieldTopics: topics}),
-    );
+    try {
+      _hubChannel.sink.add(
+        jsonEncode({fieldType: msgSubscribe, fieldTopics: topics}),
+      );
+    } catch (e) {
+      _log.warning('Cluster: Falha ao assinar tópicos (Hub offline): $e');
+    }
   }
 }

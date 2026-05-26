@@ -26,13 +26,14 @@ class LocationModelAdapter extends TypeAdapter<LocationModel> {
       maxLat: fields[6] as double?,
       minLong: fields[7] as double?,
       maxLong: fields[8] as double?,
+      updatedAt: fields[9] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, LocationModel obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -50,7 +51,9 @@ class LocationModelAdapter extends TypeAdapter<LocationModel> {
       ..writeByte(7)
       ..write(obj.minLong)
       ..writeByte(8)
-      ..write(obj.maxLong);
+      ..write(obj.maxLong)
+      ..writeByte(9)
+      ..write(obj.updatedAt);
   }
 
   @override
@@ -79,6 +82,9 @@ LocationModel _$LocationModelFromJson(Map<String, dynamic> json) =>
       maxLat: (json['maxLat'] as num?)?.toDouble(),
       minLong: (json['minLong'] as num?)?.toDouble(),
       maxLong: (json['maxLong'] as num?)?.toDouble(),
+      updatedAt: json['updatedAt'] == null
+          ? null
+          : DateTime.parse(json['updatedAt'] as String),
     );
 
 Map<String, dynamic> _$LocationModelToJson(LocationModel instance) =>
@@ -92,4 +98,5 @@ Map<String, dynamic> _$LocationModelToJson(LocationModel instance) =>
       'maxLat': instance.maxLat,
       'minLong': instance.minLong,
       'maxLong': instance.maxLong,
+      'updatedAt': instance.updatedAt?.toIso8601String(),
     };

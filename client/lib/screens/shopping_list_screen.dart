@@ -1,10 +1,16 @@
+import 'package:client/services/websocket_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../models/shopping_list.dart';
 import '../models/shopping_list_item.dart';
+import '../models/product.dart';
 import '../providers/shopping_list_provider.dart';
 import '../providers/optimization_provider.dart';
+import '../providers/websocket_provider.dart';
+import '../services/storage_service.dart';
+import '../services/image_service.dart';
 import '../widgets/empty_state_widget.dart';
 import '../widgets/optimization_result_dialog.dart';
 
@@ -35,7 +41,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
           ElevatedButton(
             onPressed: () {
               if (nameController.text.isNotEmpty) {
-                ref.read(shoppingListProvider.notifier).createList(nameController.text);
+                ref
+                    .read(shoppingListProvider.notifier)
+                    .createList(nameController.text);
                 Navigator.pop(context);
               }
             },
@@ -51,14 +59,13 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     final lists = ref.watch(shoppingListProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Minhas Listas'),
-      ),
+      appBar: AppBar(title: const Text('Minhas Listas')),
       body: lists.isEmpty
           ? EmptyStateWidget(
               icon: Icons.list_alt,
               title: 'Nenhuma lista encontrada',
-              description: 'Crie listas para organizar suas compras e encontrar os melhores preços.',
+              description:
+                  'Crie listas para organizar suas compras e encontrar os melhores preços.',
               buttonLabel: 'Criar primeira lista',
               onButtonPressed: _showCreateListDialog,
             )
@@ -88,8 +95,13 @@ class _ShoppingListTile extends ConsumerWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ListTile(
-        title: Text(list.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${list.items.length} itens • Atualizada em ${_formatDate(list.updatedAt)}'),
+        title: Text(
+          list.name,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          '${list.items.length} itens • Atualizada em ${_formatDate(list.updatedAt)}',
+        ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () {
           Navigator.push(
@@ -111,7 +123,10 @@ class _ShoppingListTile extends ConsumerWidget {
         title: const Text('Excluir Lista'),
         content: Text('Deseja realmente excluir a lista "${list.name}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
           TextButton(
             onPressed: () {
               ref.read(shoppingListProvider.notifier).deleteList(list.id);
@@ -135,28 +150,75 @@ class ShoppingListDetailScreen extends ConsumerStatefulWidget {
   const ShoppingListDetailScreen({super.key, required this.listId});
 
   @override
-  ConsumerState<ShoppingListDetailScreen> createState() => _ShoppingListDetailScreenState();
+  ConsumerState<ShoppingListDetailScreen> createState() =>
+      _ShoppingListDetailScreenState();
 }
 
-class _ShoppingListDetailScreenState extends ConsumerState<ShoppingListDetailScreen> {
+class _ShoppingListDetailScreenState
+    extends ConsumerState<ShoppingListDetailScreen> {
   final _itemController = TextEditingController();
+  final _focusNode = FocusNode();
 
-  void _addItem() {
-    if (_itemController.text.isEmpty) return;
-    
+  void _addItem([Product? selectedProduct]) {
+    final text = _itemController.text.trim();
+    if (text.isEmpty && selectedProduct == null) return;
+
+    final String name;
+    String? barcode;
+    String? category;
+
+    if (selectedProduct != null) {
+      name = selectedProduct.name;
+      barcode = selectedProduct.barcode;
+      category = selectedProduct.canonicalCategory;
+    } else {
+      // Verifica se o texto é um EAN (8-14 dígitos)
+      final eanRegex = RegExp(r'^[0-9]{8,14}$');
+      if (eanRegex.hasMatch(text)) {
+        barcode = text;
+        final localProd = StorageService.products.get(barcode);
+        if (localProd != null) {
+          name = localProd.name;
+          category = localProd.canonicalCategory;
+        } else {
+          name = 'Buscando: $text...';
+          _requestProductFromHub(barcode);
+        }
+      } else {
+        name = text;
+      }
+    }
+
     final newItem = ShoppingListItem(
       id: const Uuid().v4(),
-      name: _itemController.text.trim(),
+      barcode: barcode,
+      category: category,
+      name: name,
       createdAt: DateTime.now(),
     );
-    
-    ref.read(shoppingListProvider.notifier).addItemToList(widget.listId, newItem);
+    ref
+        .read(shoppingListProvider.notifier)
+        .addItemToList(widget.listId, newItem);
     _itemController.clear();
+    _focusNode.requestFocus();
+  }
+
+  void _requestProductFromHub(String barcode) {
+    final wsService = ref.read(webSocketServiceProvider);
+    if (wsService.currentStatus == WebSocketStatus.connected) {
+      debugPrint('ShoppingList: Solicitando produto $barcode ao Hub...');
+      wsService.sendMessage({
+        'type': 'product_request',
+        'payload': {'barcode': barcode},
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final list = ref.watch(shoppingListProvider).firstWhere((l) => l.id == widget.listId);
+    final list = ref
+        .watch(shoppingListProvider)
+        .firstWhere((l) => l.id == widget.listId);
 
     return Scaffold(
       appBar: AppBar(
@@ -182,44 +244,155 @@ class _ShoppingListDetailScreenState extends ConsumerState<ShoppingListDetailScr
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _itemController,
-                    decoration: const InputDecoration(
-                      hintText: 'Adicionar item (ex: Leite ou 789...)',
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (_) => _addItem(),
+                  child: RawAutocomplete<Product>(
+                    textEditingController: _itemController,
+                    focusNode: _focusNode,
+                    optionsBuilder: (TextEditingValue textEditingValue) {
+                      if (textEditingValue.text.isEmpty) {
+                        return const Iterable<Product>.empty();
+                      }
+                      return StorageService.products.values
+                          .where((Product option) {
+                            return option.name.toLowerCase().contains(
+                                  textEditingValue.text.toLowerCase(),
+                                ) ||
+                                option.barcode.contains(textEditingValue.text);
+                          })
+                          .take(5);
+                    },
+                    displayStringForOption: (Product option) => option.name,
+                    fieldViewBuilder:
+                        (context, controller, focusNode, onFieldSubmitted) {
+                          return TextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            decoration: const InputDecoration(
+                              hintText: 'Adicionar item (ex: Arroz ou 789...)',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.search),
+                            ),
+                            onSubmitted: (_) => _addItem(),
+                          );
+                        },
+                    optionsViewBuilder: (context, onSelected, options) {
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          elevation: 4.0,
+                          child: SizedBox(
+                            width: MediaQuery.of(context).size.width - 32,
+                            child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              itemBuilder: (BuildContext context, int index) {
+                                final Product option = options.elementAt(index);
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundImage: option.photoUrl != null
+                                        ? NetworkImage(
+                                            ImageService.sanitizeUrl(
+                                              option.photoUrl!,
+                                            ),
+                                          )
+                                        : null,
+                                    child: option.photoUrl == null
+                                        ? const Icon(Icons.shopping_bag)
+                                        : null,
+                                  ),
+                                  title: Text(option.name),
+                                  subtitle: Text(option.manufacturer),
+                                  onTap: () => onSelected(option),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    onSelected: (Product selection) => _addItem(selection),
                   ),
                 ),
                 const SizedBox(width: 8),
                 IconButton.filled(
-                  onPressed: _addItem,
+                  onPressed: () => _addItem(),
                   icon: const Icon(Icons.add),
                 ),
               ],
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: list.items.length,
-              itemBuilder: (context, index) {
-                final item = list.items[index];
-                return ListTile(
-                  leading: Checkbox(
-                    value: item.isChecked,
-                    onChanged: (_) => ref.read(shoppingListProvider.notifier).toggleItemCheck(list.id, item.id),
-                  ),
-                  title: Text(
-                    item.name,
-                    style: TextStyle(
-                      decoration: item.isChecked ? TextDecoration.lineThrough : null,
-                      color: item.isChecked ? Colors.grey : null,
-                    ),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 20),
-                    onPressed: () => ref.read(shoppingListProvider.notifier).removeItemFromList(list.id, item.id),
-                  ),
+            child: ValueListenableBuilder(
+              valueListenable: StorageService.products.listenable(),
+              builder: (context, Box<Product> box, _) {
+                return ListView.builder(
+                  itemCount: list.items.length,
+                  itemBuilder: (context, index) {
+                    final item = list.items[index];
+                    Product? product;
+                    if (item.barcode != null) {
+                      product = box.get(item.barcode);
+                    }
+
+                    return ListTile(
+                      leading: Checkbox(
+                        value: item.isChecked,
+                        onChanged: (_) => ref
+                            .read(shoppingListProvider.notifier)
+                            .toggleItemCheck(list.id, item.id),
+                      ),
+                      title: Row(
+                        children: [
+                          if (product != null)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: CircleAvatar(
+                                radius: 14,
+                                backgroundImage: product.photoUrl != null
+                                    ? NetworkImage(
+                                        ImageService.sanitizeUrl(
+                                          product.photoUrl!,
+                                        ),
+                                      )
+                                    : null,
+                                child: product.photoUrl == null
+                                    ? const Icon(Icons.shopping_bag, size: 14)
+                                    : null,
+                              ),
+                            ),
+                          Expanded(
+                            child: Text(
+                              product?.name ?? item.name,
+                              style: TextStyle(
+                                decoration: item.isChecked
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: item.isChecked ? Colors.grey : null,
+                              ),
+                            ),
+                          ),
+                          if (product?.isVerified ?? false)
+                            const Icon(
+                              Icons.verified,
+                              color: Colors.blue,
+                              size: 16,
+                            ),
+                        ],
+                      ),
+                      subtitle: product != null
+                          ? Text(
+                              product.manufacturer,
+                              style: const TextStyle(fontSize: 11),
+                            )
+                          : null,
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 20),
+                        onPressed: () => ref
+                            .read(shoppingListProvider.notifier)
+                            .removeItemFromList(list.id, item.id),
+                      ),
+                    );
+                  },
                 );
               },
             ),

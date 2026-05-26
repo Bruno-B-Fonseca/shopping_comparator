@@ -132,6 +132,14 @@ class GpiService {
     return _cache[barcode];
   }
 
+  void delete(String barcode) {
+    if (_cache.containsKey(barcode)) {
+      _cache.remove(barcode);
+      _saveCache();
+      _log.info('GPI: Product $barcode purged from cache.');
+    }
+  }
+
   Future<Map<String, dynamic>> propose(Map<String, dynamic> proposal) async {
     final barcode = proposal['barcode']?.toString();
     if (barcode == null) return proposal;

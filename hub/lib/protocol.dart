@@ -17,6 +17,7 @@ const String msgReputationUpdate = 'reputation_update';
 const String msgGpiLookup = 'gpi_lookup';
 const String msgGpiResponse = 'gpi_response';
 const String msgGpiPropose = 'gpi_propose';
+const String msgGpiDelete = 'gpi_delete';
 
 /// Novos tipos de mensagem para autenticação HMAC
 const String msgAuthChallenge = 'auth_challenge';

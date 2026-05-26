@@ -1,3 +1,32 @@
+# ✅ Implementação: Estabilidade, Versionamento e Qualidade de Dados (v1.7.0)
+
+## 🛡️ Versionamento e Resolução de Conflitos
+- **Carimbo de Versão (`updatedAt`)**: Adicionado aos modelos `Product` e `LocationModel`.
+- **Estratégia LWW (Last-Write-Wins)**: O sistema agora ignora atualizações com timestamps anteriores ao dado local.
+- **Hierarquia de Confiança**: Dados validados por Operadores (`isVerified`) têm prioridade sobre cadastros anônimos.
+- **Blindagem de Sincronização**: O `SyncService` atua como um gatekeeper, garantindo que "dispositivos antigos" não regridam dados novos na rede federada.
+
+## 🏷️ Modernização da UI de Cadastro
+### 1. **`CategoryTagInput`** - Tags de Categoria
+- Entrada baseada em tags (chips) com separação por vírgula.
+- Conversão automática para MAIÚSCULAS.
+- Persistência transparente no formato hierárquico `NÍVEL 1 > NIVEL 2`.
+
+### 2. **`NutritionalInfoInput`** - Saúde Organizada
+- Campos dedicados para Calorias, Carboidratos e Proteínas.
+- Dicas de unidade (kcal, g) integradas.
+- Parser inteligente que reconstrói a string formatada ao abrir para edição.
+
+## 🧹 Qualidade e Limpeza de Dados
+- **Validação de EAN**: Implementação do algoritmo oficial de Checksum para EAN-8/13 no scanner e entrada manual.
+- **Filtros Anti-Poluição**: Descarte automático de produtos com nomes genéricos como "Barcode Scanner" em todas as camadas (IA, Sync e UI).
+- **Correção Profunda (Reset)**: Botão laranja de "Recarregar" que executa uma purga local, solicita deleção global no Hub (`gpi_delete`) e força uma nova pesquisa limpa.
+
+## ⚡ Otimização de Performance
+- **Sync Handshake**: Refatoração do fluxo de conexão para eliminar race conditions. O app agora ouve as mensagens antes de solicitar o estado inicial, garantindo que locais e produtos não sejam perdidos no startup.
+
+---
+
 # ✅ Implementação: GPI & Carga NFC-e (Fase de Excelência)
 
 ## Novos Arquivos e Funcionalidades
@@ -31,6 +60,21 @@
 - **Verified Product**: Metadados validados pelo Hub Nacional (GPI).
 - **Official Price**: Preço validado via NFC-e ou por Operador do Local.
 - Visíveis em `ProductSearchScreen` e `ScanScreen`.
+
+## 🛡️ Arquitetura "Inquebrável" (Resiliência & Soberania)
+
+### 1. **Modo Standalone (Soberania da Ilha)**
+- O sistema foi blindado contra falhas de rede externa. 
+- Se o Hub Nacional cair, os usuários conectados ao mesmo Nó Local (L1) continuam colaborando normalmente (preços, chat e listas) sem interrupção.
+- O Nginx não trava mais se os serviços de backend estiverem ausentes.
+
+### 2. **Nó Leve (Edge Node)**
+- IA e Storage agora são opcionais no Nó, reduzindo drasticamente o consumo de RAM e CPU para o estabelecimento.
+- Delegação inteligente de metadados para o Hub via protocolo GPI.
+
+### 3. **Discovery & Automomação**
+- **API de Descoberta**: O Hub Nacional agora atua como um Geo-Registry, permitindo que apps encontrem nós próximos via coordenadas.
+- **Túneis Dinâmicos**: Suporte a URLs efêmeras com auto-anúncio via API, eliminando configuração manual de DNS.
 
 # ✅ Implementação Completa - LGPD + Segurança Reforçada
 

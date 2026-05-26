@@ -15,6 +15,8 @@ Copie o `.env.example` e preencha com seus dados:
 # Identificação do seu mercado
 LOCATION_ID=seu-cnpj-ou-id
 LOCATION_PASSWORD=sua-senha-segura
+LAT=-23.5505
+LNG=-46.6333
 
 # Credenciais Cloudflare (Zero Trust)
 CLOUDFLARE_TUNNEL_TOKEN=seu-token-aqui

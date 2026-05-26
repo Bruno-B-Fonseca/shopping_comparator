@@ -168,8 +168,17 @@ class _OperatorSettingsScreenState
                   foregroundColor: Colors.deepPurple,
                 ),
               ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _isLoading ? null : _importViaXml,
+                icon: const Icon(Icons.code),
+                label: const Text('Carga de Preços via XML (NF-e)'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.blueAccent,
+                ),
+              ),
               const Text(
-                'O arquivo deve conter uma lista de produtos. Produtos já existentes (mesmo barcode) serão pulados. O scan de nota fiscal atualiza os preços do estabelecimento.',
+                'O arquivo deve conter uma lista de produtos. Produtos já existentes (mesmo barcode) serão pulados. O scan de nota fiscal ou upload de XML oficial atualiza os preços do estabelecimento.',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
@@ -425,6 +434,91 @@ class _OperatorSettingsScreenState
     }
   }
 
+  Future<void> _importViaXml() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xml'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final bytes = result.files.first.bytes;
+      if (bytes == null) return;
+
+      final xmlContent = utf8.decode(bytes);
+
+      setState(() => _isLoading = true);
+
+      final auth = ref.read(authProvider);
+      final locationId = auth.locationId;
+      final locationPassword = auth.locationPassword;
+
+      if (locationId == null || locationPassword == null) {
+        throw Exception('Credenciais de operador não configuradas.');
+      }
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final messageId = const Uuid().v4();
+      final messageToSign = '$xmlContent$timestamp$messageId';
+
+      final key = utf8.encode(locationPassword);
+      final hmac = Hmac(sha256, key);
+      final signature = hmac.convert(utf8.encode(messageToSign)).toString();
+
+      final wsUrl = ref.read(webSocketServiceProvider).currentUrl;
+      if (wsUrl == null) throw Exception('Não conectado ao servidor.');
+
+      final baseUrl = wsUrl.replaceFirst('ws', 'http').replaceFirst('/ws', '');
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/bulk-import/xml'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'xml': xmlContent,
+              'locationId': locationId,
+              'signature': signature,
+              'timestamp': timestamp,
+              'messageId': messageId,
+            }),
+          )
+          .timeout(const Duration(seconds: 60));
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Importação XML'),
+              content: Text(result['message'] ?? 'Sucesso!'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        throw Exception(
+          'Erro no servidor (${response.statusCode}): ${response.body}',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao importar XML: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _importViaInvoice() async {
     final String? invoiceUrl = await Navigator.push<String>(
       context,
@@ -502,8 +596,21 @@ class _OperatorSettingsScreenState
       }
     } catch (e) {
       if (mounted) {
+        String message = 'Erro ao importar nota: $e';
+        if (e.toString().contains('403')) {
+          message = 'Acesso Restrito: Este portal SEFAZ requer consulta manual. Por favor, use a importação de arquivo JSON ou XML.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao importar nota: $e')),
+          SnackBar(
+            content: Text(message),
+            duration: const Duration(seconds: 7),
+            backgroundColor: Colors.orange[800],
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
         );
       }
     } finally {

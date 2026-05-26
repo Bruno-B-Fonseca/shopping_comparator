@@ -5,10 +5,13 @@ import '../models/product.dart';
 import '../models/price_update.dart';
 import '../models/location_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/websocket_provider.dart';
 import '../services/storage_service.dart';
 import '../services/image_service.dart';
 import '../widgets/empty_state_widget.dart';
 import '../widgets/product_image_picker.dart';
+import '../widgets/category_tag_input.dart';
+import '../widgets/nutritional_info_input.dart';
 import 'scan_screen.dart';
 
 class ProductSearchScreen extends ConsumerStatefulWidget {
@@ -116,7 +119,6 @@ class _ProductSearchScreenState extends ConsumerState<ProductSearchScreen> {
   ) {
     if (_query.isEmpty) return [];
 
-    // Busca IDs de locais que batem com a query
     final matchingLocations = locBox.values
         .where((loc) => loc.name.toLowerCase().contains(_query))
         .map((loc) => loc.id)
@@ -124,7 +126,6 @@ class _ProductSearchScreenState extends ConsumerState<ProductSearchScreen> {
 
     return productBox.values
         .where((p) {
-          // Busca direta no produto
           final matchesProduct =
               p.name.toLowerCase().contains(_query) ||
               p.manufacturer.toLowerCase().contains(_query) ||
@@ -133,7 +134,6 @@ class _ProductSearchScreenState extends ConsumerState<ProductSearchScreen> {
 
           if (matchesProduct) return true;
 
-          // Busca por local (se algum preço deste produto foi registrado num local que bate com a query)
           final hasMatchingLocation = priceBox.values.any(
             (price) =>
                 price.barcode == p.barcode &&
@@ -143,7 +143,6 @@ class _ProductSearchScreenState extends ConsumerState<ProductSearchScreen> {
           return hasMatchingLocation;
         })
         .map((p) {
-          // Encontra o menor preço para este produto
           final productPrices = priceBox.values
               .where((price) => price.barcode == p.barcode)
               .toList();
@@ -180,6 +179,179 @@ class _ProductResultTile extends ConsumerWidget {
 
   const _ProductResultTile({required this.item});
 
+  void _forceReRegistration(BuildContext context, WidgetRef ref, String barcode) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmar Purga'),
+        content: const Text(
+          'Isso apagará os dados atuais do seu celular e do Hub, '
+          'solicitando uma nova pesquisa à IA. Continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Não'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              StorageService.products.delete(barcode);
+              final ws = ref.read(webSocketServiceProvider);
+              ws.sendMessage({'type': 'gpi_delete', 'barcode': barcode});
+              ws.sendMessage({
+                'type': 'product_request',
+                'payload': {'barcode': barcode, 'force': true},
+              });
+              Navigator.pop(ctx);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Solicitada nova pesquisa para este EAN...')),
+              );
+            },
+            child: const Text('Sim, Resetar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditProductDialog(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController(text: item.product.name);
+    final manufacturerController = TextEditingController(
+      text: item.product.manufacturer,
+    );
+    final unitController = TextEditingController(text: item.product.unit);
+    final categoryController = TextEditingController(
+      text: item.product.canonicalCategory ?? '',
+    );
+    final nutritionController = TextEditingController(
+      text: item.product.nutritionalInfo ?? '',
+    );
+    String? currentPhotoUrl = item.product.photoUrl;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              const Expanded(child: Text('Editar Produto')),
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.orange),
+                tooltip: 'Forçar Re-cadastro (Purga local e Hub)',
+                onPressed: () => _forceReRegistration(context, ref, item.product.barcode),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        backgroundImage: currentPhotoUrl != null
+                            ? NetworkImage(
+                                ImageService.sanitizeUrl(currentPhotoUrl!),
+                              )
+                            : null,
+                        child: currentPhotoUrl == null
+                            ? const Icon(Icons.shopping_bag, size: 40)
+                            : null,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: ProductImagePicker(
+                          onImageUploaded: (url) {
+                            setState(() {
+                              currentPhotoUrl = url;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Nome'),
+                ),
+                TextField(
+                  controller: manufacturerController,
+                  decoration: const InputDecoration(labelText: 'Fabricante'),
+                ),
+                TextField(
+                  controller: unitController,
+                  decoration: const InputDecoration(
+                    labelText: 'Unidade (ex: 1kg, 500ml)',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                CategoryTagInput(
+                  initialValue: item.product.canonicalCategory,
+                  onChanged: (value) {
+                    categoryController.text = value;
+                  },
+                ),
+                const SizedBox(height: 16),
+                NutritionalInfoInput(
+                  initialValue: item.product.nutritionalInfo,
+                  onChanged: (value) {
+                    nutritionController.text = value;
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final updatedProduct = Product(
+                  barcode: item.product.barcode,
+                  name: nameController.text.trim(),
+                  manufacturer: manufacturerController.text.trim(),
+                  unit: unitController.text.trim(),
+                  nutritionalInfo: nutritionController.text.trim(),
+                  photoUrl: currentPhotoUrl,
+                  isVerified: item.product.isVerified,
+                  canonicalCategory: categoryController.text.trim().isEmpty
+                      ? null
+                      : categoryController.text.trim(),
+                  updatedAt: DateTime.now(),
+                );
+
+                StorageService.products.put(
+                  item.product.barcode,
+                  updatedProduct,
+                );
+
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Produto atualizado com sucesso!'),
+                  ),
+                );
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -200,7 +372,6 @@ class _ProductResultTile extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar com imagem do produto
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: colorScheme.surfaceContainerHighest,
@@ -234,7 +405,7 @@ class _ProductResultTile extends ConsumerWidget {
                             ),
                           if (item.product.isLocal)
                             Padding(
-                              padding: const EdgeInsets.only(left: 4.0),
+                              padding: EdgeInsets.only(left: 4.0),
                               child: Tooltip(
                                 message: 'Produção Local / Artesanal',
                                 child: Icon(Icons.home_work, color: Colors.orange.shade700, size: 16),
@@ -291,11 +462,10 @@ class _ProductResultTile extends ConsumerWidget {
                         if (isOperator)
                           IconButton(
                             icon: const Icon(Icons.edit, size: 20),
-                            onPressed: () => _showEditProductDialog(context),
+                            onPressed: () => _showEditProductDialog(context, ref),
                             tooltip: 'Editar Produto',
                             color: colorScheme.primary,
                           ),
-                        // AÇÃO: Ir para tela de Scan/Preço
                         IconButton.filledTonal(
                           icon: const Icon(Icons.add_shopping_cart, size: 20),
                           onPressed: () {
@@ -321,9 +491,7 @@ class _ProductResultTile extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withAlpha(
-                    76,
-                  ), // 0.3 * 255
+                  color: colorScheme.primaryContainer.withAlpha(76),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -360,13 +528,12 @@ class _ProductResultTile extends ConsumerWidget {
                               size: 12,
                               color: colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 8),
                             Text(
                               item.location!.name,
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ],
                         ),
@@ -396,132 +563,6 @@ class _ProductResultTile extends ConsumerWidget {
                   textAlign: TextAlign.center,
                 ),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showEditProductDialog(BuildContext context) {
-    final nameController = TextEditingController(text: item.product.name);
-    final manufacturerController = TextEditingController(
-      text: item.product.manufacturer,
-    );
-    final unitController = TextEditingController(text: item.product.unit);
-    final categoryController = TextEditingController(
-      text: item.product.canonicalCategory ?? '',
-    );
-    final nutritionController = TextEditingController(
-      text: item.product.nutritionalInfo ?? '',
-    );
-    String? currentPhotoUrl = item.product.photoUrl;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Editar Produto'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Picker de Imagem para o Produto
-                Center(
-                  child: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                        backgroundImage: currentPhotoUrl != null
-                            ? NetworkImage(
-                                ImageService.sanitizeUrl(currentPhotoUrl!),
-                              )
-                            : null,
-                        child: currentPhotoUrl == null
-                            ? const Icon(Icons.shopping_bag, size: 40)
-                            : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: ProductImagePicker(
-                          onImageUploaded: (url) {
-                            setState(() {
-                              currentPhotoUrl = url;
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Nome'),
-                ),
-                TextField(
-                  controller: manufacturerController,
-                  decoration: const InputDecoration(labelText: 'Fabricante'),
-                ),
-                TextField(
-                  controller: unitController,
-                  decoration: const InputDecoration(
-                    labelText: 'Unidade (ex: 1kg, 500ml)',
-                  ),
-                ),
-                TextField(
-                  controller: categoryController,
-                  decoration: const InputDecoration(
-                    labelText: 'Categoria Canônica (ex: PADARIA > PAO)',
-                  ),
-                ),
-                TextField(
-                  controller: nutritionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Info Nutricional',
-                  ),
-                  maxLines: 3,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final updatedProduct = Product(
-                  barcode: item.product.barcode,
-                  name: nameController.text.trim(),
-                  manufacturer: manufacturerController.text.trim(),
-                  unit: unitController.text.trim(),
-                  nutritionalInfo: nutritionController.text.trim(),
-                  photoUrl: currentPhotoUrl,
-                  isVerified: item.product.isVerified,
-                  canonicalCategory: categoryController.text.trim().isEmpty
-                      ? null
-                      : categoryController.text.trim(),
-                );
-
-                StorageService.products.put(
-                  item.product.barcode,
-                  updatedProduct,
-                );
-
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Produto atualizado com sucesso!'),
-                  ),
-                );
-              },
-              child: const Text('Salvar'),
-            ),
           ],
         ),
       ),
